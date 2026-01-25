@@ -13,6 +13,24 @@ function getCodePoints(str: string): number[] {
   return codePoints
 }
 
+// Returns an array mapping each codepoint index to its grapheme cluster index
+function getGraphemeClusterIndices(str: string): number[] {
+  const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' })
+  const segments = [...segmenter.segment(str)]
+  const indices: number[] = []
+
+  for (let clusterIndex = 0; clusterIndex < segments.length; clusterIndex++) {
+    const segment = segments[clusterIndex]
+    // Count codepoints in this segment
+    const codePointCount = [...segment.segment].length
+    for (let i = 0; i < codePointCount; i++) {
+      indices.push(clusterIndex)
+    }
+  }
+
+  return indices
+}
+
 function formatCodePoint(cp: number): string {
   return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0')
 }
@@ -119,6 +137,7 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   const codePoints = getCodePoints(input)
+  const graphemeIndices = getGraphemeClusterIndices(input)
 
   // Initialize DB on mount
   useEffect(() => {
@@ -196,11 +215,16 @@ function App() {
                   {codePoints.map((cp, index) => {
                     const info = charInfos.get(cp)
                     const isSelected = selectedIndex === index
+                    const graphemeIndex = graphemeIndices[index]
+                    const isEvenCluster = graphemeIndex % 2 === 0
+                    const clusterBg = isEvenCluster ? 'bg-white' : 'bg-green-50'
+                    const prevGraphemeIndex = index > 0 ? graphemeIndices[index - 1] : graphemeIndex
+                    const isClusterStart = graphemeIndex !== prevGraphemeIndex
                     return (
                       <tr
                         key={index}
                         onClick={() => setSelectedIndex(index)}
-                        className={`cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                        className={`cursor-pointer ${isSelected ? 'bg-blue-100' : `${clusterBg} hover:bg-blue-50`} ${isClusterStart ? 'border-t-2 border-t-gray-400' : ''}`}
                       >
                         <td className="px-4 py-3 text-2xl">{String.fromCodePoint(cp)}</td>
                         <td className="px-4 py-3 font-mono text-blue-600">{formatCodePoint(cp)}</td>
