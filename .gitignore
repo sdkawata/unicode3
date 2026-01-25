@@ -32,3 +32,6 @@ data/
 # Generated SQLite database
 public/unicode.db
 
+# Drizzle migrations (regenerated each build)
+drizzle/
+
