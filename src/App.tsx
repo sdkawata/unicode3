@@ -17,17 +17,94 @@ function formatCodePoint(cp: number): string {
   return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0')
 }
 
+function DetailPanel({ info }: { info: CharacterInfo }) {
+  return (
+    <div className="space-y-4">
+      {/* Character display */}
+      <div className="text-center py-6 bg-gray-50 rounded-lg">
+        <div className="text-8xl mb-2">{String.fromCodePoint(info.codepoint)}</div>
+        <div className="font-mono text-blue-600 text-xl">{formatCodePoint(info.codepoint)}</div>
+      </div>
+
+      {/* Name */}
+      <div>
+        <div className="text-sm text-gray-500 mb-1">名前</div>
+        <div className="font-medium">{getDisplayName(info)}</div>
+      </div>
+
+      {/* Basic info grid */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-sm text-gray-500 mb-1">カテゴリ</div>
+          <div className="font-mono">{info.category ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-sm text-gray-500 mb-1">Script</div>
+          <div>{info.script ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-sm text-gray-500 mb-1">ブロック</div>
+          <div>{info.block ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-sm text-gray-500 mb-1">Bidi Class</div>
+          <div className="font-mono">{info.bidiClass ?? '-'}</div>
+        </div>
+      </div>
+
+      {/* Emoji */}
+      {info.isEmoji && (
+        <div>
+          <span className="inline-block px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm">
+            Emoji
+          </span>
+        </div>
+      )}
+
+      {/* Decomposition */}
+      {info.decompositionType && (
+        <div>
+          <div className="text-sm text-gray-500 mb-1">分解 ({info.decompositionType})</div>
+          <div className="flex gap-2 flex-wrap">
+            {info.decomposition.map((cp, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded">
+                <span className="text-lg">{String.fromCodePoint(cp)}</span>
+                <span className="font-mono text-xs text-gray-500">{formatCodePoint(cp)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Aliases */}
+      {info.aliases.length > 0 && (
+        <div>
+          <div className="text-sm text-gray-500 mb-1">別名</div>
+          <div className="space-y-1">
+            {info.aliases.map((alias, i) => (
+              <div key={i} className="text-sm">
+                <span className="text-gray-400">[{alias.type}]</span>{' '}
+                <span>{alias.alias}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function App() {
   const [input, setInput] = useState('')
   const [charInfos, setCharInfos] = useState<Map<number, CharacterInfo>>(new Map())
   const [loading, setLoading] = useState(false)
   const [dbReady, setDbReady] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   const codePoints = getCodePoints(input)
 
   // Initialize DB on mount
   useEffect(() => {
-    // Trigger DB initialization
     getCharacterInfo(0x0041).then(() => {
       setDbReady(true)
     }).catch(console.error)
@@ -37,6 +114,7 @@ function App() {
   useEffect(() => {
     if (!dbReady || codePoints.length === 0) {
       setCharInfos(new Map())
+      setSelectedIndex(null)
       return
     }
 
@@ -54,10 +132,16 @@ function App() {
       }
       setCharInfos(newInfos)
       setLoading(false)
+      // Select first character by default
+      if (codePoints.length > 0) {
+        setSelectedIndex(0)
+      }
     }
 
     fetchInfos()
   }, [input, dbReady])
+
+  const selectedInfo = selectedIndex !== null ? charInfos.get(codePoints[selectedIndex]) : null
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -80,45 +164,49 @@ function App() {
         )}
 
         {codePoints.length > 0 && !loading && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">文字</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">コードポイント</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">名前</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">カテゴリ</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ブロック</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Script</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {codePoints.map((cp, index) => {
-                  const info = charInfos.get(cp)
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-2xl">
-                        {String.fromCodePoint(cp)}
-                        {info?.isEmoji && <span className="ml-1 text-xs text-orange-500">emoji</span>}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-blue-600">{formatCodePoint(cp)}</td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {info ? getDisplayName(info) : '(unknown)'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-sm font-mono">
-                        {info?.category ?? '-'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-sm">
-                        {info?.block ?? '-'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-sm">
-                        {info?.script ?? '-'}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="flex gap-6">
+            {/* Left: Table */}
+            <div className="flex-1 bg-white rounded-lg shadow overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">文字</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">コードポイント</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">名前</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {codePoints.map((cp, index) => {
+                    const info = charInfos.get(cp)
+                    const isSelected = selectedIndex === index
+                    return (
+                      <tr
+                        key={index}
+                        onClick={() => setSelectedIndex(index)}
+                        className={`cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                      >
+                        <td className="px-4 py-3 text-2xl">{String.fromCodePoint(cp)}</td>
+                        <td className="px-4 py-3 font-mono text-blue-600">{formatCodePoint(cp)}</td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {info ? getDisplayName(info) : '(unknown)'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Right: Detail Panel */}
+            <div className="w-80 bg-white rounded-lg shadow p-6">
+              {selectedInfo ? (
+                <DetailPanel info={selectedInfo} />
+              ) : (
+                <div className="text-gray-400 text-center py-8">
+                  文字を選択してください
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
