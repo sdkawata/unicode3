@@ -9,6 +9,7 @@ export type CharacterInfo = {
   script: string | null;
   bidiClass: string | null;
   decompositionType: string | null;
+  eastAsianWidth: string | null;
   isEmoji: boolean;
   aliases: { alias: string; type: string }[];
   decomposition: number[];
@@ -55,6 +56,7 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     script: char.script,
     bidiClass: char.bidiClass,
     decompositionType: char.decompositionType,
+    eastAsianWidth: char.eastAsianWidth,
     isEmoji: Boolean(char.isEmoji),
     aliases,
     decomposition: decomp.map(d => d.targetCp),

@@ -9,6 +9,7 @@ export const characters = sqliteTable('characters', {
   script: text('script'),
   bidiClass: text('bidi_class'),
   decompositionType: text('decomposition_type'),  // canonical, compat, circle, wide, narrow, etc. (null = 分解なし)
+  eastAsianWidth: text('east_asian_width'),       // F, H, W, Na, A, N
   isEmoji: integer('is_emoji', { mode: 'boolean' }),
 }, (table) => [
   index('idx_characters_name').on(table.name),

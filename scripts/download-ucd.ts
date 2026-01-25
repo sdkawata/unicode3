@@ -12,6 +12,7 @@ const FILES_TO_DOWNLOAD = [
   'Blocks.txt',
   'Scripts.txt',
   'PropertyValueAliases.txt',
+  'EastAsianWidth.txt',
   'emoji/emoji-data.txt',
 ];
 

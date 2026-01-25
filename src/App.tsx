@@ -17,6 +17,19 @@ function formatCodePoint(cp: number): string {
   return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0')
 }
 
+function formatEastAsianWidth(eaw: string | null): string {
+  if (!eaw) return '-'
+  const names: Record<string, string> = {
+    F: 'Fullwidth',
+    H: 'Halfwidth',
+    W: 'Wide',
+    Na: 'Narrow',
+    A: 'Ambiguous',
+    N: 'Neutral',
+  }
+  return `${eaw} (${names[eaw] ?? 'Unknown'})`
+}
+
 function DetailPanel({ info }: { info: CharacterInfo }) {
   return (
     <div className="space-y-4">
@@ -49,6 +62,10 @@ function DetailPanel({ info }: { info: CharacterInfo }) {
         <div>
           <div className="text-sm text-gray-500 mb-1">Bidi Class</div>
           <div className="font-mono">{info.bidiClass ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-sm text-gray-500 mb-1">East Asian Width</div>
+          <div className="font-mono">{formatEastAsianWidth(info.eastAsianWidth)}</div>
         </div>
       </div>
 

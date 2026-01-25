@@ -185,6 +185,43 @@ export async function parseEmojiData(filepath: string): Promise<Set<number>> {
   return emojiCodepoints;
 }
 
+export interface EastAsianWidthRange {
+  startCp: number;
+  endCp: number;
+  width: string;
+}
+
+// Parse EastAsianWidth.txt
+// Format: codepoint or range ; East_Asian_Width
+export async function parseEastAsianWidth(filepath: string): Promise<EastAsianWidthRange[]> {
+  const content = await readFile(filepath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+  const widths: EastAsianWidthRange[] = [];
+
+  for (const line of lines) {
+    const match = line.match(/^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s*;\s*(\w+)/i);
+    if (match) {
+      const startCp = parseInt(match[1], 16);
+      const endCp = match[2] ? parseInt(match[2], 16) : startCp;
+      const width = match[3];
+      widths.push({ startCp, endCp, width });
+    }
+  }
+
+  return widths;
+}
+
+// Helper: Find East Asian Width for a codepoint
+export function findEastAsianWidth(codepoint: number, widths: EastAsianWidthRange[]): string | null {
+  for (const range of widths) {
+    if (codepoint >= range.startCp && codepoint <= range.endCp) {
+      return range.width;
+    }
+  }
+  return null;
+}
+
 // Helper: Find block for a codepoint
 export function findBlock(codepoint: number, blocks: Block[]): string | null {
   for (const block of blocks) {

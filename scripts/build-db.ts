@@ -12,8 +12,10 @@ import {
   parseBlocks,
   parseScripts,
   parseEmojiData,
+  parseEastAsianWidth,
   findBlock,
   findScript,
+  findEastAsianWidth,
 } from './parse-ucd';
 
 const UCD_DIR = './data/ucd';
@@ -48,11 +50,12 @@ async function main() {
 
   // Parse UCD files
   console.log('Parsing UCD files...');
-  const [unicodeData, nameAliases, blocks, scripts, emojiSet] = await Promise.all([
+  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet] = await Promise.all([
     parseUnicodeData(join(UCD_DIR, 'UnicodeData.txt')),
     parseNameAliases(join(UCD_DIR, 'NameAliases.txt')),
     parseBlocks(join(UCD_DIR, 'Blocks.txt')),
     parseScripts(join(UCD_DIR, 'Scripts.txt')),
+    parseEastAsianWidth(join(UCD_DIR, 'EastAsianWidth.txt')),
     parseEmojiData(join(UCD_DIR, 'emoji/emoji-data.txt')),
   ]);
 
@@ -60,6 +63,7 @@ async function main() {
   console.log(`  NameAliases: ${nameAliases.length} aliases`);
   console.log(`  Blocks: ${blocks.length} blocks`);
   console.log(`  Scripts: ${scripts.length} ranges`);
+  console.log(`  EastAsianWidth: ${eastAsianWidths.length} ranges`);
   console.log(`  Emoji: ${emojiSet.size} codepoints`);
 
   // Insert blocks using Drizzle
@@ -83,6 +87,7 @@ async function main() {
   for (const char of unicodeData) {
     const blockName = findBlock(char.codepoint, blocks);
     const scriptName = findScript(char.codepoint, scripts);
+    const eaw = findEastAsianWidth(char.codepoint, eastAsianWidths);
     const isEmoji = emojiSet.has(char.codepoint);
 
     characterValues.push({
@@ -93,6 +98,7 @@ async function main() {
       script: scriptName,
       bidiClass: char.bidiClass,
       decompositionType: char.decompositionType,
+      eastAsianWidth: eaw,
       isEmoji,
     });
 
