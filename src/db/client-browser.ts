@@ -18,8 +18,8 @@ export async function getDb(): Promise<DbInstance> {
     locateFile: (file) => `https://sql.js.org/dist/${file}`,
   });
 
-  // Fetch the database file
-  const response = await fetch('/unicode.db');
+  // Fetch the database file (use Vite's base URL)
+  const response = await fetch(`${import.meta.env.BASE_URL}unicode.db`);
   if (!response.ok) {
     throw new Error(`Failed to fetch database: ${response.status}`);
   }
