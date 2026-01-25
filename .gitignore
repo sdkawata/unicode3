@@ -25,3 +25,12 @@ dist-ssr
 
 # Claude
 .claude/
+
+# UCD data (downloaded)
+data/
+
+# Generated SQLite database
+public/unicode.db
+
+# Drizzle migrations
+drizzle/
