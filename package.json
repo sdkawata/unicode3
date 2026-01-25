@@ -9,8 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "ucd:download": "tsx scripts/download-ucd.ts",
-    "ucd:build": "tsx scripts/build-db.ts",
-    "ucd:all": "npm run ucd:download && npm run ucd:build"
+    "ucd:build": "npm run db:generate && tsx scripts/build-db.ts",
+    "ucd:all": "npm run ucd:download && npm run ucd:build",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.1",

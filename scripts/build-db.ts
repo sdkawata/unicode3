@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { sql } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -17,6 +18,16 @@ import {
 
 const UCD_DIR = './data/ucd';
 const DB_PATH = './public/unicode.db';
+const BATCH_SIZE = 500; // SQLite parameter limit workaround
+
+// Helper to chunk array for batch inserts
+function chunk<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
 
 async function main() {
   console.log('Building Unicode database...\n');
@@ -27,50 +38,13 @@ async function main() {
     console.log('Removed existing database');
   }
 
-  // Create database
+  // Create database and apply migrations
   const sqlite = new Database(DB_PATH);
   const db = drizzle(sqlite, { schema });
 
-  // Create tables
-  console.log('Creating tables...');
-  sqlite.exec(`
-    CREATE TABLE characters (
-      codepoint INTEGER PRIMARY KEY,
-      name TEXT,
-      category TEXT,
-      block TEXT,
-      script TEXT,
-      bidi_class TEXT,
-      decomposition_type TEXT,
-      is_emoji INTEGER
-    );
-
-    CREATE TABLE decomposition_mappings (
-      source_cp INTEGER NOT NULL,
-      target_cp INTEGER NOT NULL,
-      position INTEGER NOT NULL,
-      PRIMARY KEY (source_cp, position)
-    );
-
-    CREATE TABLE name_aliases (
-      codepoint INTEGER NOT NULL,
-      alias TEXT NOT NULL,
-      type TEXT NOT NULL,
-      PRIMARY KEY (codepoint, type, alias)
-    );
-
-    CREATE TABLE blocks (
-      start_cp INTEGER NOT NULL,
-      end_cp INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      PRIMARY KEY (start_cp, end_cp)
-    );
-
-    CREATE INDEX idx_characters_name ON characters(name);
-    CREATE INDEX idx_characters_block ON characters(block);
-    CREATE INDEX idx_decomp_source ON decomposition_mappings(source_cp);
-    CREATE INDEX idx_decomp_target ON decomposition_mappings(target_cp);
-  `);
+  // Apply migrations from drizzle folder
+  console.log('Applying migrations...');
+  migrate(db, { migrationsFolder: './drizzle' });
 
   // Parse UCD files
   console.log('Parsing UCD files...');
@@ -88,79 +62,82 @@ async function main() {
   console.log(`  Scripts: ${scripts.length} ranges`);
   console.log(`  Emoji: ${emojiSet.size} codepoints`);
 
-  // Insert blocks
+  // Insert blocks using Drizzle
   console.log('\nInserting blocks...');
-  const insertBlock = sqlite.prepare(
-    'INSERT INTO blocks (start_cp, end_cp, name) VALUES (?, ?, ?)'
-  );
-  for (const block of blocks) {
-    insertBlock.run(block.startCp, block.endCp, block.name);
+  const blockValues = blocks.map(block => ({
+    startCp: block.startCp,
+    endCp: block.endCp,
+    name: block.name,
+  }));
+
+  for (const batch of chunk(blockValues, BATCH_SIZE)) {
+    db.insert(schema.blocks).values(batch).run();
   }
+  console.log(`  Inserted ${blocks.length} blocks`);
 
-  // Insert characters
+  // Prepare character and decomposition data
   console.log('Inserting characters...');
-  const insertChar = sqlite.prepare(`
-    INSERT INTO characters (codepoint, name, category, block, script, bidi_class, decomposition_type, is_emoji)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const insertDecomp = sqlite.prepare(
-    'INSERT INTO decomposition_mappings (source_cp, target_cp, position) VALUES (?, ?, ?)'
-  );
+  const characterValues: (typeof schema.characters.$inferInsert)[] = [];
+  const decompositionValues: (typeof schema.decompositionMappings.$inferInsert)[] = [];
 
-  let charCount = 0;
-  let decompCount = 0;
+  for (const char of unicodeData) {
+    const blockName = findBlock(char.codepoint, blocks);
+    const scriptName = findScript(char.codepoint, scripts);
+    const isEmoji = emojiSet.has(char.codepoint);
 
-  const insertTransaction = sqlite.transaction(() => {
-    for (const char of unicodeData) {
-      const blockName = findBlock(char.codepoint, blocks);
-      const scriptName = findScript(char.codepoint, scripts);
-      const isEmoji = emojiSet.has(char.codepoint) ? 1 : 0;
+    characterValues.push({
+      codepoint: char.codepoint,
+      name: char.name,
+      category: char.category,
+      block: blockName,
+      script: scriptName,
+      bidiClass: char.bidiClass,
+      decompositionType: char.decompositionType,
+      isEmoji,
+    });
 
-      insertChar.run(
-        char.codepoint,
-        char.name,
-        char.category,
-        blockName,
-        scriptName,
-        char.bidiClass,
-        char.decompositionType,
-        isEmoji
-      );
-      charCount++;
-
-      // Insert decomposition mappings
-      if (char.decompositionMapping.length > 0) {
-        for (let i = 0; i < char.decompositionMapping.length; i++) {
-          insertDecomp.run(char.codepoint, char.decompositionMapping[i], i);
-          decompCount++;
-        }
+    // Collect decomposition mappings
+    if (char.decompositionMapping.length > 0) {
+      for (let i = 0; i < char.decompositionMapping.length; i++) {
+        decompositionValues.push({
+          sourceCp: char.codepoint,
+          targetCp: char.decompositionMapping[i],
+          position: i,
+        });
       }
     }
-  });
+  }
 
-  insertTransaction();
-  console.log(`  Inserted ${charCount} characters`);
-  console.log(`  Inserted ${decompCount} decomposition mappings`);
+  // Insert characters in batches
+  for (const batch of chunk(characterValues, BATCH_SIZE)) {
+    db.insert(schema.characters).values(batch).run();
+  }
+  console.log(`  Inserted ${characterValues.length} characters`);
 
-  // Insert name aliases
+  // Insert decomposition mappings in batches
+  console.log('Inserting decomposition mappings...');
+  for (const batch of chunk(decompositionValues, BATCH_SIZE)) {
+    db.insert(schema.decompositionMappings).values(batch).run();
+  }
+  console.log(`  Inserted ${decompositionValues.length} decomposition mappings`);
+
+  // Insert name aliases using Drizzle
   console.log('Inserting name aliases...');
-  const insertAlias = sqlite.prepare(
-    'INSERT OR IGNORE INTO name_aliases (codepoint, alias, type) VALUES (?, ?, ?)'
-  );
+  const aliasValues = nameAliases.map(alias => ({
+    codepoint: alias.codepoint,
+    alias: alias.alias,
+    type: alias.type,
+  }));
 
-  const aliasTransaction = sqlite.transaction(() => {
-    for (const alias of nameAliases) {
-      insertAlias.run(alias.codepoint, alias.alias, alias.type);
-    }
-  });
-
-  aliasTransaction();
+  for (const batch of chunk(aliasValues, BATCH_SIZE)) {
+    db.insert(schema.nameAliases).values(batch).onConflictDoNothing().run();
+  }
   console.log(`  Inserted ${nameAliases.length} aliases`);
 
   // Optimize database
   console.log('\nOptimizing database...');
-  sqlite.exec('VACUUM');
-  sqlite.exec('ANALYZE');
+  db.run(sql`VACUUM`);
+  db.run(sql`ANALYZE`);
 
   sqlite.close();
 
