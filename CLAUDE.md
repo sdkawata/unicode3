@@ -24,7 +24,7 @@ scripts/
   download-ucd.ts      # UCD ファイル + Unihan.zip をダウンロード → data/ucd/
   parse-ucd.ts         # UCD テキストファイルをパースする関数群
   build-db.ts          # パース結果を SQLite DB に投入 → public/unicode.db
-drizzle/               # Drizzle マイグレーション SQL
+drizzle/               # Drizzle マイグレーション SQL (gitignore)
 data/ucd/              # ダウンロードした UCD ファイル (gitignore)
 public/unicode.db      # ビルド済み DB (gitignore)
 ```
@@ -46,6 +46,10 @@ npm run build          # プロダクションビルド
 2. `db:generate` — `src/db/schema.ts` からマイグレーション SQL を生成
 3. `build-db.ts` — マイグレーション適用 → UCD パース → バッチインサート → VACUUM/ANALYZE
 4. ブラウザは `public/unicode.db` を fetch して sql.js で開く
+
+## 注意事項
+
+- `drizzle/` はコミットしない。毎回 DB を新規作成するため過去のマイグレーション履歴は不要。
 
 ## スキーマ変更時の手順
 
