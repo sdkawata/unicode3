@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { getDb, schema } from '../db/client-browser';
+import { getDb, schema } from './client-browser';
 
 export type CharacterInfo = {
   codepoint: number;

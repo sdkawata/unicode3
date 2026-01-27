@@ -1,198 +1,49 @@
-import { useState, useEffect } from 'react'
-import type { CharacterInfo } from './lib/unicode-db'
-import { getCharacterInfo, getDisplayName } from './lib/unicode-db'
+import { useState, useTransition, Suspense } from 'react'
+import type { CharacterInfo } from './db/query'
+import { getCharacterInfo } from './db/query'
+import { getCodePoints } from './components/format'
+import { CharacterView } from './components/CharacterView'
 
-function getCodePoints(str: string): number[] {
-  const codePoints: number[] = []
-  for (const char of str) {
-    const cp = char.codePointAt(0)
-    if (cp !== undefined) {
-      codePoints.push(cp)
+// Promise cache for character info fetching
+const charInfoCache = new Map<string, Promise<Map<number, CharacterInfo>>>()
+
+function fetchCharInfos(input: string): Promise<Map<number, CharacterInfo>> {
+  const cached = charInfoCache.get(input)
+  if (cached) return cached
+
+  const codePoints = getCodePoints(input)
+  if (codePoints.length === 0) {
+    const empty = Promise.resolve(new Map<number, CharacterInfo>())
+    charInfoCache.set(input, empty)
+    return empty
+  }
+
+  const promise = (async () => {
+    const infos = new Map<number, CharacterInfo>()
+    for (const cp of codePoints) {
+      if (!infos.has(cp)) {
+        const info = await getCharacterInfo(cp)
+        if (info) infos.set(cp, info)
+      }
     }
-  }
-  return codePoints
-}
+    return infos
+  })()
 
-// Returns an array mapping each codepoint index to its grapheme cluster index
-function getGraphemeClusterIndices(str: string): number[] {
-  const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' })
-  const segments = [...segmenter.segment(str)]
-  const indices: number[] = []
-
-  for (let clusterIndex = 0; clusterIndex < segments.length; clusterIndex++) {
-    const segment = segments[clusterIndex]
-    // Count codepoints in this segment
-    const codePointCount = [...segment.segment].length
-    for (let i = 0; i < codePointCount; i++) {
-      indices.push(clusterIndex)
-    }
-  }
-
-  return indices
-}
-
-function formatCodePoint(cp: number): string {
-  return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0')
-}
-
-function formatEastAsianWidth(eaw: string | null): string {
-  if (!eaw) return '-'
-  const names: Record<string, string> = {
-    F: 'Fullwidth',
-    H: 'Halfwidth',
-    W: 'Wide',
-    Na: 'Narrow',
-    A: 'Ambiguous',
-    N: 'Neutral',
-  }
-  return `${eaw} (${names[eaw] ?? 'Unknown'})`
-}
-
-function DetailPanel({ info }: { info: CharacterInfo }) {
-  return (
-    <div className="space-y-4">
-      {/* Character display */}
-      <div className="text-center py-6 bg-gray-50 rounded-lg">
-        <div className="text-8xl mb-2">{String.fromCodePoint(info.codepoint)}</div>
-        <div className="font-mono text-blue-600 text-xl">{formatCodePoint(info.codepoint)}</div>
-      </div>
-
-      {/* Name */}
-      <div>
-        <div className="text-sm text-gray-500 mb-1">名前</div>
-        <div className="font-medium">{getDisplayName(info)}</div>
-      </div>
-
-      {/* Basic info grid */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-sm text-gray-500 mb-1">カテゴリ</div>
-          <div className="font-mono">{info.category ?? '-'}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-500 mb-1">Script</div>
-          <div>{info.script ?? '-'}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-500 mb-1">ブロック</div>
-          <div>{info.block ?? '-'}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-500 mb-1">Bidi Class</div>
-          <div className="font-mono">{info.bidiClass ?? '-'}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-500 mb-1">East Asian Width</div>
-          <div className="font-mono">{formatEastAsianWidth(info.eastAsianWidth)}</div>
-        </div>
-      </div>
-
-      {/* Emoji */}
-      {info.isEmoji && (
-        <div>
-          <span className="inline-block px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm">
-            Emoji
-          </span>
-        </div>
-      )}
-
-      {/* Decomposition */}
-      {info.decompositionType && (
-        <div>
-          <div className="text-sm text-gray-500 mb-1">分解 ({info.decompositionType})</div>
-          <div className="flex gap-2 flex-wrap">
-            {info.decomposition.map((cp, i) => (
-              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded">
-                <span className="text-lg">{String.fromCodePoint(cp)}</span>
-                <span className="font-mono text-xs text-gray-500">{formatCodePoint(cp)}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Unihan Properties */}
-      {info.unihanProperties.length > 0 && (
-        <div>
-          <div className="text-sm text-gray-500 mb-1">Unihan プロパティ</div>
-          <div className="space-y-1">
-            {info.unihanProperties.map((prop, i) => (
-              <div key={i} className="text-sm">
-                <span className="text-gray-400">{prop.property}</span>{' '}
-                <span>{prop.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Aliases */}
-      {info.aliases.length > 0 && (
-        <div>
-          <div className="text-sm text-gray-500 mb-1">別名</div>
-          <div className="space-y-1">
-            {info.aliases.map((alias, i) => (
-              <div key={i} className="text-sm">
-                <span className="text-gray-400">[{alias.type}]</span>{' '}
-                <span>{alias.alias}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
+  charInfoCache.set(input, promise)
+  return promise
 }
 
 function App() {
   const [input, setInput] = useState('')
-  const [charInfos, setCharInfos] = useState<Map<number, CharacterInfo>>(new Map())
-  const [loading, setLoading] = useState(false)
-  const [dbReady, setDbReady] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [infoPromise, setInfoPromise] = useState(() => fetchCharInfos(''))
+  const [, startTransition] = useTransition()
 
-  const codePoints = getCodePoints(input)
-  const graphemeIndices = getGraphemeClusterIndices(input)
-
-  // Initialize DB on mount
-  useEffect(() => {
-    getCharacterInfo(0x0041).then(() => {
-      setDbReady(true)
-    }).catch(console.error)
-  }, [])
-
-  // Fetch character info when input changes
-  useEffect(() => {
-    if (!dbReady || codePoints.length === 0) {
-      setCharInfos(new Map())
-      setSelectedIndex(null)
-      return
-    }
-
-    setLoading(true)
-
-    const fetchInfos = async () => {
-      const newInfos = new Map<number, CharacterInfo>()
-      for (const cp of codePoints) {
-        if (!newInfos.has(cp)) {
-          const info = await getCharacterInfo(cp)
-          if (info) {
-            newInfos.set(cp, info)
-          }
-        }
-      }
-      setCharInfos(newInfos)
-      setLoading(false)
-      // Select first character by default
-      if (codePoints.length > 0) {
-        setSelectedIndex(0)
-      }
-    }
-
-    fetchInfos()
-  }, [input, dbReady])
-
-  const selectedInfo = selectedIndex !== null ? charInfos.get(codePoints[selectedIndex]) : null
+  const handleInputChange = (value: string) => {
+    setInput(value)
+    startTransition(() => {
+      setInfoPromise(fetchCharInfos(value))
+    })
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -204,67 +55,14 @@ function App() {
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={dbReady ? "文字列を入力..." : "データベース読み込み中..."}
-          disabled={!dbReady}
-          className="w-full p-4 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6 disabled:bg-gray-200"
+          onChange={(e) => handleInputChange(e.target.value)}
+          placeholder="文字列を入力..."
+          className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
         />
 
-        {loading && (
-          <div className="text-gray-500 mb-4">読み込み中...</div>
-        )}
-
-        {codePoints.length > 0 && !loading && (
-          <div className="flex gap-6">
-            {/* Left: Table */}
-            <div className="flex-1 bg-white rounded-lg shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">文字</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">コードポイント</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">名前</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {codePoints.map((cp, index) => {
-                    const info = charInfos.get(cp)
-                    const isSelected = selectedIndex === index
-                    const graphemeIndex = graphemeIndices[index]
-                    const isEvenCluster = graphemeIndex % 2 === 0
-                    const clusterBg = isEvenCluster ? 'bg-white' : 'bg-green-50'
-                    const prevGraphemeIndex = index > 0 ? graphemeIndices[index - 1] : graphemeIndex
-                    const isClusterStart = graphemeIndex !== prevGraphemeIndex
-                    return (
-                      <tr
-                        key={index}
-                        onClick={() => setSelectedIndex(index)}
-                        className={`cursor-pointer ${isSelected ? 'bg-blue-100' : `${clusterBg} hover:bg-blue-50`} ${isClusterStart ? 'border-t-2 border-t-gray-400' : ''}`}
-                      >
-                        <td className="px-4 py-3 text-2xl">{String.fromCodePoint(cp)}</td>
-                        <td className="px-4 py-3 font-mono text-blue-600">{formatCodePoint(cp)}</td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {info ? getDisplayName(info) : '(unknown)'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Right: Detail Panel */}
-            <div className="w-80 bg-white rounded-lg shadow p-6">
-              {selectedInfo ? (
-                <DetailPanel info={selectedInfo} />
-              ) : (
-                <div className="text-gray-400 text-center py-8">
-                  文字を選択してください
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <Suspense fallback={<div className="text-gray-500">データベース読み込み中...</div>}>
+          <CharacterView infoPromise={infoPromise} input={input} />
+        </Suspense>
       </div>
     </div>
   )
