@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, lte, gte } from 'drizzle-orm';
 import { getDb, schema } from './client-browser';
 
 export type CharacterInfo = {
@@ -6,6 +6,7 @@ export type CharacterInfo = {
   name: string | null;
   category: string | null;
   block: string | null;
+  blockRange: { start: number; end: number } | null;
   script: string | null;
   bidiClass: string | null;
   decompositionType: string | null;
@@ -49,6 +50,19 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     .where(eq(schema.decompositionMappings.sourceCp, codepoint))
     .orderBy(schema.decompositionMappings.position);
 
+  // Get block range
+  const [blockRow] = await db
+    .select({
+      startCp: schema.blocks.startCp,
+      endCp: schema.blocks.endCp,
+    })
+    .from(schema.blocks)
+    .where(and(
+      lte(schema.blocks.startCp, codepoint),
+      gte(schema.blocks.endCp, codepoint),
+    ))
+    .limit(1);
+
   // Get Unihan properties
   const unihanProps = await db
     .select({
@@ -63,6 +77,7 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     name: char.name,
     category: char.category,
     block: char.block,
+    blockRange: blockRow ? { start: blockRow.startCp, end: blockRow.endCp } : null,
     script: char.script,
     bidiClass: char.bidiClass,
     decompositionType: char.decompositionType,

@@ -1,6 +1,6 @@
 import type { CharacterInfo } from '../db/query'
 import { getDisplayName } from '../db/query'
-import { formatCodePoint, formatEastAsianWidth } from './format'
+import { formatCodePoint, formatCategory, formatEastAsianWidth } from './format'
 
 export function DetailPanel({ info }: { info: CharacterInfo }) {
   return (
@@ -17,11 +17,11 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         <div className="font-medium">{getDisplayName(info)}</div>
       </div>
 
-      {/* Basic info grid */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Basic info */}
+      <div className="space-y-3">
         <div>
           <div className="text-sm text-gray-500 mb-1">カテゴリ</div>
-          <div className="font-mono">{info.category ?? '-'}</div>
+          <div className="font-mono">{formatCategory(info.category)}</div>
         </div>
         <div>
           <div className="text-sm text-gray-500 mb-1">Script</div>
@@ -29,7 +29,14 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
         <div>
           <div className="text-sm text-gray-500 mb-1">ブロック</div>
-          <div>{info.block ?? '-'}</div>
+          <div>
+            {info.block ?? '-'}
+            {info.blockRange && (
+              <span className="text-gray-400 ml-1">
+                ({formatCodePoint(info.blockRange.start)}..{formatCodePoint(info.blockRange.end)})
+              </span>
+            )}
+          </div>
         </div>
         <div>
           <div className="text-sm text-gray-500 mb-1">Bidi Class</div>

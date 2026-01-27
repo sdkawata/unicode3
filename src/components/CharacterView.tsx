@@ -58,7 +58,7 @@ export function CharacterView({ infoPromise, input }: { infoPromise: Promise<Map
       </div>
 
       {/* Right: Detail Panel */}
-      <div className="w-80 bg-white rounded-lg shadow p-6">
+      <div className="w-[480px] shrink-0 bg-white rounded-lg shadow p-6 overflow-y-auto">
         {selectedInfo ? (
           <DetailPanel info={selectedInfo} />
         ) : (
