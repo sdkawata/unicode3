@@ -36,6 +36,16 @@ export const nameAliases = sqliteTable('name_aliases', {
   primaryKey({ columns: [table.codepoint, table.type, table.alias] }),
 ]);
 
+// Unihanプロパティテーブル（複合主キー）
+export const unihanProperties = sqliteTable('unihan_properties', {
+  codepoint: integer('codepoint').notNull(),
+  property: text('property').notNull(),
+  value: text('value').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.codepoint, table.property] }),
+  index('idx_unihan_codepoint').on(table.codepoint),
+]);
+
 // ブロック範囲テーブル（複合主キー）
 export const blocks = sqliteTable('blocks', {
   startCp: integer('start_cp').notNull(),

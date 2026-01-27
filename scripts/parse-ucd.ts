@@ -1,4 +1,5 @@
-import { readFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
+import { join } from 'path';
 
 // Types for parsed data
 export interface CharacterData {
@@ -210,6 +211,39 @@ export async function parseEastAsianWidth(filepath: string): Promise<EastAsianWi
   }
 
   return widths;
+}
+
+export interface UnihanProperty {
+  codepoint: number;
+  property: string;
+  value: string;
+}
+
+// Parse all Unihan files in a directory
+// Format: U+XXXX\tkPropertyName\tvalue
+export async function parseUnihan(dirPath: string): Promise<UnihanProperty[]> {
+  const files = await readdir(dirPath);
+  const unihanFiles = files.filter(f => f.startsWith('Unihan') && f.endsWith('.txt'));
+  const results: UnihanProperty[] = [];
+
+  for (const file of unihanFiles) {
+    const content = await readFile(join(dirPath, file), 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+    for (const line of lines) {
+      const parts = line.split('\t');
+      if (parts.length < 3) continue;
+      const cpMatch = parts[0].match(/^U\+([0-9A-F]+)$/i);
+      if (!cpMatch) continue;
+      results.push({
+        codepoint: parseInt(cpMatch[1], 16),
+        property: parts[1],
+        value: parts.slice(2).join('\t'),
+      });
+    }
+  }
+
+  return results;
 }
 
 // Helper: Find East Asian Width for a codepoint

@@ -13,6 +13,7 @@ import {
   parseScripts,
   parseEmojiData,
   parseEastAsianWidth,
+  parseUnihan,
   findBlock,
   findScript,
   findEastAsianWidth,
@@ -50,13 +51,14 @@ async function main() {
 
   // Parse UCD files
   console.log('Parsing UCD files...');
-  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet] = await Promise.all([
+  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData] = await Promise.all([
     parseUnicodeData(join(UCD_DIR, 'UnicodeData.txt')),
     parseNameAliases(join(UCD_DIR, 'NameAliases.txt')),
     parseBlocks(join(UCD_DIR, 'Blocks.txt')),
     parseScripts(join(UCD_DIR, 'Scripts.txt')),
     parseEastAsianWidth(join(UCD_DIR, 'EastAsianWidth.txt')),
     parseEmojiData(join(UCD_DIR, 'emoji/emoji-data.txt')),
+    parseUnihan(join(UCD_DIR, 'Unihan')),
   ]);
 
   console.log(`  UnicodeData: ${unicodeData.length} characters`);
@@ -65,6 +67,7 @@ async function main() {
   console.log(`  Scripts: ${scripts.length} ranges`);
   console.log(`  EastAsianWidth: ${eastAsianWidths.length} ranges`);
   console.log(`  Emoji: ${emojiSet.size} codepoints`);
+  console.log(`  Unihan: ${unihanData.length} properties`);
 
   // Insert blocks using Drizzle
   console.log('\nInserting blocks...');
@@ -139,6 +142,19 @@ async function main() {
     db.insert(schema.nameAliases).values(batch).onConflictDoNothing().run();
   }
   console.log(`  Inserted ${nameAliases.length} aliases`);
+
+  // Insert Unihan properties
+  console.log('Inserting Unihan properties...');
+  const unihanValues = unihanData.map(u => ({
+    codepoint: u.codepoint,
+    property: u.property,
+    value: u.value,
+  }));
+
+  for (const batch of chunk(unihanValues, BATCH_SIZE)) {
+    db.insert(schema.unihanProperties).values(batch).onConflictDoNothing().run();
+  }
+  console.log(`  Inserted ${unihanData.length} Unihan properties`);
 
   // Optimize database
   console.log('\nOptimizing database...');

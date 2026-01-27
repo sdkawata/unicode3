@@ -13,6 +13,7 @@ export type CharacterInfo = {
   isEmoji: boolean;
   aliases: { alias: string; type: string }[];
   decomposition: number[];
+  unihanProperties: { property: string; value: string }[];
 };
 
 export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo | null> {
@@ -48,6 +49,15 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     .where(eq(schema.decompositionMappings.sourceCp, codepoint))
     .orderBy(schema.decompositionMappings.position);
 
+  // Get Unihan properties
+  const unihanProps = await db
+    .select({
+      property: schema.unihanProperties.property,
+      value: schema.unihanProperties.value,
+    })
+    .from(schema.unihanProperties)
+    .where(eq(schema.unihanProperties.codepoint, codepoint));
+
   return {
     codepoint: char.codepoint,
     name: char.name,
@@ -60,6 +70,7 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     isEmoji: Boolean(char.isEmoji),
     aliases,
     decomposition: decomp.map(d => d.targetCp),
+    unihanProperties: unihanProps,
   };
 }
 

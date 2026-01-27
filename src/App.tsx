@@ -111,6 +111,21 @@ function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
       )}
 
+      {/* Unihan Properties */}
+      {info.unihanProperties.length > 0 && (
+        <div>
+          <div className="text-sm text-gray-500 mb-1">Unihan プロパティ</div>
+          <div className="space-y-1">
+            {info.unihanProperties.map((prop, i) => (
+              <div key={i} className="text-sm">
+                <span className="text-gray-400">{prop.property}</span>{' '}
+                <span>{prop.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Aliases */}
       {info.aliases.length > 0 && (
         <div>
