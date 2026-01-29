@@ -12,6 +12,8 @@ export type CharacterInfo = {
   decompositionType: string | null;
   eastAsianWidth: string | null;
   isEmoji: boolean;
+  isJis0208: boolean;
+  isCp932: boolean;
   aliases: { alias: string; type: string }[];
   decomposition: number[];
   unihanProperties: { property: string; value: string }[];
@@ -83,6 +85,8 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     decompositionType: char.decompositionType,
     eastAsianWidth: char.eastAsianWidth,
     isEmoji: Boolean(char.isEmoji),
+    isJis0208: Boolean(char.isJis0208),
+    isCp932: Boolean(char.isCp932),
     aliases,
     decomposition: decomp.map(d => d.targetCp),
     unihanProperties: unihanProps,

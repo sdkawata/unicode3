@@ -275,3 +275,43 @@ export function findScript(codepoint: number, scripts: ScriptRange[]): string | 
   }
   return null;
 }
+
+// Parse JIS0208.TXT (Unicode official mapping)
+// Format: SJIS   JIS    Unicode  # comment
+// Example: 0x8140  0x2121  0x3000  # IDEOGRAPHIC SPACE
+export async function parseJis0208(filepath: string): Promise<Set<number>> {
+  const content = await readFile(filepath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+  const unicodeCodepoints = new Set<number>();
+
+  for (const line of lines) {
+    const match = line.match(/0x[0-9A-F]+\s+0x[0-9A-F]+\s+0x([0-9A-F]+)/i);
+    if (match) {
+      const unicode = parseInt(match[1], 16);
+      unicodeCodepoints.add(unicode);
+    }
+  }
+
+  return unicodeCodepoints;
+}
+
+// Parse CP932.TXT (Unicode official mapping)
+// Format: CP932   Unicode  # comment
+// Example: 0x8140  0x3000  # IDEOGRAPHIC SPACE
+export async function parseCp932(filepath: string): Promise<Set<number>> {
+  const content = await readFile(filepath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+  const unicodeCodepoints = new Set<number>();
+
+  for (const line of lines) {
+    const match = line.match(/0x[0-9A-F]+\s+0x([0-9A-F]+)/i);
+    if (match) {
+      const unicode = parseInt(match[1], 16);
+      unicodeCodepoints.add(unicode);
+    }
+  }
+
+  return unicodeCodepoints;
+}

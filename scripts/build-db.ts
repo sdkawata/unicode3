@@ -14,6 +14,8 @@ import {
   parseEmojiData,
   parseEastAsianWidth,
   parseUnihan,
+  parseJis0208,
+  parseCp932,
   findBlock,
   findScript,
   findEastAsianWidth,
@@ -51,7 +53,7 @@ async function main() {
 
   // Parse UCD files
   console.log('Parsing UCD files...');
-  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData] = await Promise.all([
+  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData, jis0208Set, cp932Set] = await Promise.all([
     parseUnicodeData(join(UCD_DIR, 'UnicodeData.txt')),
     parseNameAliases(join(UCD_DIR, 'NameAliases.txt')),
     parseBlocks(join(UCD_DIR, 'Blocks.txt')),
@@ -59,6 +61,8 @@ async function main() {
     parseEastAsianWidth(join(UCD_DIR, 'EastAsianWidth.txt')),
     parseEmojiData(join(UCD_DIR, 'emoji/emoji-data.txt')),
     parseUnihan(join(UCD_DIR, 'Unihan')),
+    parseJis0208(join(UCD_DIR, 'mappings/JIS0208.TXT')),
+    parseCp932(join(UCD_DIR, 'mappings/CP932.TXT')),
   ]);
 
   console.log(`  UnicodeData: ${unicodeData.length} characters`);
@@ -68,6 +72,8 @@ async function main() {
   console.log(`  EastAsianWidth: ${eastAsianWidths.length} ranges`);
   console.log(`  Emoji: ${emojiSet.size} codepoints`);
   console.log(`  Unihan: ${unihanData.length} properties`);
+  console.log(`  JIS X 0208: ${jis0208Set.size} codepoints`);
+  console.log(`  CP932: ${cp932Set.size} codepoints`);
 
   // Insert blocks using Drizzle
   console.log('\nInserting blocks...');
@@ -92,6 +98,8 @@ async function main() {
     const scriptName = findScript(char.codepoint, scripts);
     const eaw = findEastAsianWidth(char.codepoint, eastAsianWidths);
     const isEmoji = emojiSet.has(char.codepoint);
+    const isJis0208 = jis0208Set.has(char.codepoint);
+    const isCp932 = cp932Set.has(char.codepoint);
 
     characterValues.push({
       codepoint: char.codepoint,
@@ -103,6 +111,8 @@ async function main() {
       decompositionType: char.decompositionType,
       eastAsianWidth: eaw,
       isEmoji,
+      isJis0208,
+      isCp932,
     });
 
     // Collect decomposition mappings

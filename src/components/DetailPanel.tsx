@@ -48,12 +48,24 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
       </div>
 
-      {/* Emoji */}
-      {info.isEmoji && (
-        <div>
-          <span className="inline-block px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm">
-            Emoji
-          </span>
+      {/* Tags */}
+      {(info.isEmoji || info.isJis0208 || info.isCp932) && (
+        <div className="flex gap-2 flex-wrap">
+          {info.isEmoji && (
+            <span className="inline-block px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm">
+              Emoji
+            </span>
+          )}
+          {info.isJis0208 && (
+            <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
+              JIS X 0208
+            </span>
+          )}
+          {info.isCp932 && (
+            <span className="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-sm">
+              CP932
+            </span>
+          )}
         </div>
       )}
 

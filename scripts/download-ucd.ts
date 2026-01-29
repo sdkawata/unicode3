@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 
 const UNICODE_VERSION = '16.0.0';
 const BASE_URL = `https://www.unicode.org/Public/${UNICODE_VERSION}/ucd`;
+const MAPPINGS_BASE_URL = 'https://www.unicode.org/Public/MAPPINGS';
 const OUTPUT_DIR = './data/ucd';
 
 const FILES_TO_DOWNLOAD = [
@@ -15,6 +16,12 @@ const FILES_TO_DOWNLOAD = [
   'PropertyValueAliases.txt',
   'EastAsianWidth.txt',
   'emoji/emoji-data.txt',
+];
+
+// マッピングファイル (Unicode公式)
+const MAPPING_FILES = [
+  { url: `${MAPPINGS_BASE_URL}/OBSOLETE/EASTASIA/JIS/JIS0208.TXT`, output: 'mappings/JIS0208.TXT' },
+  { url: `${MAPPINGS_BASE_URL}/VENDORS/MICSFT/WINDOWS/CP932.TXT`, output: 'mappings/CP932.TXT' },
 ];
 
 async function downloadFile(filename: string): Promise<void> {
@@ -54,6 +61,24 @@ async function main() {
       console.error(`Error downloading ${file}:`, error);
       process.exit(1);
     }
+  }
+
+  // Download mapping files (JIS X 0208, CP932)
+  console.log('\nDownloading mapping files...');
+  const mappingsDir = join(OUTPUT_DIR, 'mappings');
+  if (!existsSync(mappingsDir)) {
+    await mkdir(mappingsDir, { recursive: true });
+  }
+
+  for (const mapping of MAPPING_FILES) {
+    console.log(`Downloading ${mapping.output}...`);
+    const response = await fetch(mapping.url);
+    if (!response.ok) {
+      throw new Error(`Failed to download ${mapping.url}: ${response.status} ${response.statusText}`);
+    }
+    const text = await response.text();
+    await writeFile(join(OUTPUT_DIR, mapping.output), text, 'utf-8');
+    console.log(`  Saved to ${join(OUTPUT_DIR, mapping.output)} (${text.length} bytes)`);
   }
 
   // Download and extract Unihan.zip

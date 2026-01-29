@@ -11,6 +11,8 @@ export const characters = sqliteTable('characters', {
   decompositionType: text('decomposition_type'),  // canonical, compat, circle, wide, narrow, etc. (null = 分解なし)
   eastAsianWidth: text('east_asian_width'),       // F, H, W, Na, A, N
   isEmoji: integer('is_emoji', { mode: 'boolean' }),
+  isJis0208: integer('is_jis_0208', { mode: 'boolean' }),  // JIS X 0208 に含まれる
+  isCp932: integer('is_cp932', { mode: 'boolean' }),       // CP932 (Windows-31J) に含まれる
 }, (table) => [
   index('idx_characters_name').on(table.name),
   index('idx_characters_block').on(table.block),
