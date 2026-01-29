@@ -109,6 +109,8 @@ export async function getCharactersInfo(codepoints: number[]): Promise<Map<numbe
 }
 
 // Search characters using FTS4
+// NOTE: FTS4 は Drizzle がネイティブサポートしていないため、生の sql.js API を使用
+// これは FTS4 関連処理のみの例外。通常のクエリは Drizzle のメソッドを使うこと
 export async function searchCharacters(query: string, limit = 100): Promise<number[]> {
   if (!query || query.trim().length === 0) {
     return [];
@@ -116,7 +118,6 @@ export async function searchCharacters(query: string, limit = 100): Promise<numb
 
   const sqlite = await getSqlite();
 
-  // Use raw SQL for FTS4 MATCH query
   const stmt = sqlite.prepare(
     `SELECT rowid as codepoint FROM search_fts WHERE search_fts MATCH ? LIMIT ?`
   );

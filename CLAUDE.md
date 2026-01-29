@@ -51,6 +51,19 @@ npm run build          # プロダクションビルド
 
 - `drizzle/` はコミットしない。毎回 DB を新規作成するため過去のマイグレーション履歴は不要。
 
+## コーディング規約
+
+### DB アクセス
+
+- **原則**: Drizzle ORM のスキーマ定義とメソッドを使用する
+  - テーブル定義: `src/db/schema.ts` に Drizzle スキーマとして定義
+  - テーブル作成: `drizzle-kit generate` でマイグレーション生成
+  - クエリ: Drizzle のクエリビルダー (`db.select()`, `db.insert()` 等) を使用
+- **例外: FTS4 全文検索**
+  - Drizzle は FTS4 仮想テーブルをネイティブサポートしていない
+  - FTS4 関連処理のみ、生 SQL (`sql` タグ) や生の sql.js API を使用可
+  - 該当箇所にはコメントで例外であることを明記すること
+
 ## スキーマ変更時の手順
 
 1. `src/db/schema.ts` を編集

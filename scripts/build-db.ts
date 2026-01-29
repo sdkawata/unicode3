@@ -167,6 +167,8 @@ async function main() {
   console.log(`  Inserted ${unihanData.length} Unihan properties`);
 
   // Create FTS4 search index
+  // NOTE: FTS4 は Drizzle がネイティブサポートしていないため、better-sqlite3 API を直接使用
+  // これは FTS4 関連処理のみの例外。通常のテーブル操作は Drizzle のメソッドを使うこと
   console.log('Creating FTS4 search index...');
   sqlite.exec('CREATE VIRTUAL TABLE search_fts USING fts4(name, readings)');
 
