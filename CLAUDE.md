@@ -60,3 +60,12 @@ npm run build          # プロダクションビルド
 5. `src/lib/unicode-db.ts` でクエリ追加
 6. `src/App.tsx` で UI 追加
 7. `npm run ucd:all` で検証
+
+## 動作確認
+
+UI 変更後は Playwright MCP で動作確認すること。開発サーバー (localhost:5173) に対して:
+
+1. `mcp__playwright__browser_navigate` でページを開く
+2. `mcp__playwright__browser_snapshot` で現在の状態を確認
+3. `mcp__playwright__browser_click` / `mcp__playwright__browser_type` で操作
+4. `mcp__playwright__browser_console_messages` でエラーがないか確認

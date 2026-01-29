@@ -112,6 +112,12 @@ export async function getDb(): Promise<DbInstance> {
   return initPromise;
 }
 
+// Get raw sql.js Database instance for direct queries (e.g., FTS4)
+export async function getSqlite(): Promise<SqlJsDatabase> {
+  await getDb(); // Ensure initialization
+  return sqliteInstance!;
+}
+
 export function closeDb(): void {
   if (sqliteInstance) {
     sqliteInstance.close();

@@ -1,5 +1,5 @@
 import { eq, and, lte, gte } from 'drizzle-orm';
-import { getDb, schema } from './client-browser';
+import { getDb, getSqlite, schema } from './client-browser';
 
 export type CharacterInfo = {
   codepoint: number;
@@ -105,6 +105,30 @@ export async function getCharactersInfo(codepoints: number[]): Promise<Map<numbe
   });
 
   await Promise.all(promises);
+  return results;
+}
+
+// Search characters using FTS4
+export async function searchCharacters(query: string, limit = 100): Promise<number[]> {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  const sqlite = await getSqlite();
+
+  // Use raw SQL for FTS4 MATCH query
+  const stmt = sqlite.prepare(
+    `SELECT rowid as codepoint FROM search_fts WHERE search_fts MATCH ? LIMIT ?`
+  );
+  stmt.bind([query.trim(), limit]);
+
+  const results: number[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as { codepoint: number };
+    results.push(row.codepoint);
+  }
+  stmt.free();
+
   return results;
 }
 

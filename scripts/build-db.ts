@@ -166,6 +166,29 @@ async function main() {
   }
   console.log(`  Inserted ${unihanData.length} Unihan properties`);
 
+  // Create FTS4 search index
+  console.log('Creating FTS4 search index...');
+  sqlite.exec('CREATE VIRTUAL TABLE search_fts USING fts4(name, readings)');
+
+  // Build search data: name + kJapaneseKun + kJapaneseOn
+  const searchData = sqlite.prepare(`
+    SELECT c.codepoint, c.name,
+           GROUP_CONCAT(CASE WHEN u.property IN ('kJapaneseKun', 'kJapaneseOn') THEN u.value END, ' ') as readings
+    FROM characters c
+    LEFT JOIN unihan_properties u ON c.codepoint = u.codepoint
+    WHERE c.name IS NOT NULL OR u.property IS NOT NULL
+    GROUP BY c.codepoint
+  `).all() as { codepoint: number; name: string | null; readings: string | null }[];
+
+  const insertFts = sqlite.prepare('INSERT INTO search_fts(rowid, name, readings) VALUES (?, ?, ?)');
+  const insertFtsMany = sqlite.transaction((rows: typeof searchData) => {
+    for (const r of rows) {
+      insertFts.run(r.codepoint, r.name, r.readings);
+    }
+  });
+  insertFtsMany(searchData);
+  console.log(`  Indexed ${searchData.length} characters for search`);
+
   // Optimize database
   console.log('\nOptimizing database...');
   db.run(sql`VACUUM`);
