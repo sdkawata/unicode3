@@ -7,29 +7,39 @@ type DbInstance = ReturnType<typeof drizzle<typeof schema>>;
 
 let dbInstance: DbInstance | null = null;
 let sqliteInstance: SqlJsDatabase | null = null;
+let initPromise: Promise<DbInstance> | null = null;
 
 export async function getDb(): Promise<DbInstance> {
   if (dbInstance) {
     return dbInstance;
   }
 
-  // Initialize SQL.js
-  const SQL = await initSqlJs({
-    locateFile: (file) => `https://sql.js.org/dist/${file}`,
-  });
-
-  // Fetch the database file (use Vite's base URL)
-  const response = await fetch(`${import.meta.env.BASE_URL}unicode.db`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch database: ${response.status}`);
+  // 初期化中なら同じPromiseを返す（複数回fetchを防ぐ）
+  if (initPromise) {
+    return initPromise;
   }
 
-  const buffer = await response.arrayBuffer();
-  sqliteInstance = new SQL.Database(new Uint8Array(buffer));
+  initPromise = (async () => {
+    // Initialize SQL.js
+    const SQL = await initSqlJs({
+      locateFile: (file) => `https://sql.js.org/dist/${file}`,
+    });
 
-  dbInstance = drizzle(sqliteInstance, { schema });
+    // Fetch the database file (use Vite's base URL)
+    const response = await fetch(`${import.meta.env.BASE_URL}unicode.db`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch database: ${response.status}`);
+    }
 
-  return dbInstance;
+    const buffer = await response.arrayBuffer();
+    sqliteInstance = new SQL.Database(new Uint8Array(buffer));
+
+    dbInstance = drizzle(sqliteInstance, { schema });
+
+    return dbInstance;
+  })();
+
+  return initPromise;
 }
 
 export function closeDb(): void {
@@ -37,6 +47,7 @@ export function closeDb(): void {
     sqliteInstance.close();
     sqliteInstance = null;
     dbInstance = null;
+    initPromise = null;
   }
 }
 
