@@ -47,6 +47,16 @@ function idbPut(db: IDBDatabase, key: string, value: unknown): Promise<void> {
 async function getCachedDbBuffer(): Promise<ArrayBuffer> {
   const currentVersion = __DB_VERSION__;
 
+  // Dev モードではキャッシュを無効化（DB 再ビルド時にサーバー再起動不要にするため）
+  if (import.meta.env.DEV) {
+    console.log('[DB] Dev mode, skipping cache');
+    const response = await fetch(`${import.meta.env.BASE_URL}unicode.db`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch database: ${response.status}`);
+    }
+    return response.arrayBuffer();
+  }
+
   try {
     const idb = await openIDB();
     const cachedVersion = await idbGet<string>(idb, VERSION_KEY);
