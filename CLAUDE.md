@@ -93,3 +93,18 @@ UI 変更後は Playwright MCP で動作確認すること。開発サーバー 
 2. `mcp__playwright__browser_snapshot` で現在の状態を確認
 3. `mcp__playwright__browser_click` / `mcp__playwright__browser_type` で操作
 4. `mcp__playwright__browser_console_messages` でエラーがないか確認
+
+## コミット前の確認
+
+**コミット前に必ず以下を実行すること:**
+
+```bash
+npx tsc -b
+```
+
+これにより以下のエラーを事前に検出できる:
+- 未使用の import/変数 (TS6133)
+- 型エラー
+- その他の TypeScript コンパイルエラー
+
+GitHub Actions の CI ビルドは `tsc -b && vite build` を実行するため、ローカルで `tsc` が通らないコードはリモートでも失敗する。
