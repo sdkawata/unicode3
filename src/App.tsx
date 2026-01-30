@@ -1,11 +1,23 @@
-import { useState, useTransition, Suspense } from 'react'
+import { useState, useTransition, Suspense, useEffect, useSyncExternalStore } from 'react'
 import type { CharacterInfo } from './db/query'
-import { getCharacterInfo, searchCharacters } from './db/query'
+import { getCharacterInfo, searchCharacters, preloadSearchIndex, isSearchIndexReady, onSearchIndexReady } from './db/query'
 import { getCodePoints } from './components/format'
 import { CharacterView } from './components/CharacterView'
 import { SearchResultView } from './components/SearchResultView'
 
 type Mode = 'input' | 'search'
+
+// Start loading search index immediately on module load
+preloadSearchIndex()
+
+// Hook to subscribe to search index ready state
+function useSearchIndexReady(): boolean {
+  return useSyncExternalStore(
+    onSearchIndexReady,
+    isSearchIndexReady,
+    isSearchIndexReady
+  );
+}
 
 // Promise cache for character info fetching
 const charInfoCache = new Map<string, Promise<Map<number, CharacterInfo>>>()
@@ -167,6 +179,7 @@ function App() {
           ) : (
             <SearchResults
               searchResultsPromise={searchResultsPromise}
+              searchQuery={searchQuery}
               onAddToInput={handleAddToInput}
             />
           )}
@@ -179,13 +192,26 @@ function App() {
 // Wrapper component to handle search results with Suspense
 function SearchResults({
   searchResultsPromise,
+  searchQuery,
   onAddToInput,
 }: {
   searchResultsPromise: Promise<number[]>
+  searchQuery: string
   onAddToInput: (char: string) => void
 }) {
+  const isIndexReady = useSearchIndexReady()
   const searchResults = React.use(searchResultsPromise)
   const charInfosPromise = fetchCharInfosForSearch(searchResults)
+
+  // Show building message if index is not ready and user is trying to search
+  if (!isIndexReady && searchQuery.length >= 2) {
+    return (
+      <div className="text-gray-500 text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-blue-600 mr-3 align-middle"></div>
+        検索インデックスを構築中...
+      </div>
+    )
+  }
 
   if (searchResults.length === 0) {
     return (

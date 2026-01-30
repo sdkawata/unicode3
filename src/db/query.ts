@@ -1,8 +1,13 @@
 import { eq, and, lte, gte } from 'drizzle-orm';
 import { getDb, schema } from './client-browser';
 
-// Re-export searchCharacters from the FlexSearch-based module
-export { searchCharacters } from './search';
+// Re-export search functions from the FlexSearch-based module
+export {
+  searchCharacters,
+  preloadSearchIndex,
+  isSearchIndexReady,
+  onSearchIndexReady,
+} from './search';
 
 export type CharacterInfo = {
   codepoint: number;

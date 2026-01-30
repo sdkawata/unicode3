@@ -13,6 +13,7 @@ let workerReady = false;
 let initPromise: Promise<void> | null = null;
 let pendingSearches: Map<string, { resolve: (results: number[]) => void; reject: (err: Error) => void }> = new Map();
 let searchIdCounter = 0;
+let readyListeners: (() => void)[] = [];
 
 // IndexedDB helpers
 function openIDB(): Promise<IDBDatabase> {
@@ -101,6 +102,13 @@ function postToWorker(msg: WorkerMessage): void {
   worker?.postMessage(msg);
 }
 
+function notifyReady(): void {
+  for (const listener of readyListeners) {
+    listener();
+  }
+  readyListeners = [];
+}
+
 function handleWorkerMessage(e: MessageEvent<WorkerResponse>): void {
   const msg = e.data;
 
@@ -108,6 +116,7 @@ function handleWorkerMessage(e: MessageEvent<WorkerResponse>): void {
     case 'ready':
     case 'imported':
       workerReady = true;
+      notifyReady();
       break;
     case 'results':
       // Resolve pending search (using searchIdCounter trick not needed for single search)
@@ -246,4 +255,21 @@ export async function searchCharacters(query: string, limit = 100): Promise<numb
 // Pre-initialize the worker (can be called early to start building in background)
 export function preloadSearchIndex(): void {
   initializeWorker().catch(console.error);
+}
+
+// Check if search index is ready
+export function isSearchIndexReady(): boolean {
+  return workerReady;
+}
+
+// Subscribe to be notified when search index becomes ready
+export function onSearchIndexReady(callback: () => void): () => void {
+  if (workerReady) {
+    callback();
+    return () => {};
+  }
+  readyListeners.push(callback);
+  return () => {
+    readyListeners = readyListeners.filter(l => l !== callback);
+  };
 }
