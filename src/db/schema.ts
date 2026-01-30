@@ -65,3 +65,13 @@ export const cldrAnnotations = sqliteTable('cldr_annotations', {
 }, (table) => [
   index('idx_cldr_codepoint').on(table.codepoint),
 ]);
+
+// Variation Sequences テーブル
+export const variationSequences = sqliteTable('variation_sequences', {
+  baseCp: integer('base_cp').notNull(),
+  variationSelector: integer('variation_selector').notNull(),
+  description: text('description').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.baseCp, table.variationSelector] }),
+  index('idx_variation_base').on(table.baseCp),
+]);

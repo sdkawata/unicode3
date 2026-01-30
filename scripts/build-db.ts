@@ -17,6 +17,8 @@ import {
   parseJis0208,
   parseCp932,
   parseCldrAnnotations,
+  parseStandardizedVariants,
+  parseEmojiVariationSequences,
   findBlock,
   findScript,
   findEastAsianWidth,
@@ -54,7 +56,7 @@ async function main() {
 
   // Parse UCD files
   console.log('Parsing UCD files...');
-  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData, jis0208Set, cp932Set, cldrAnnotations] = await Promise.all([
+  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData, jis0208Set, cp932Set, cldrAnnotations, standardizedVariants, emojiVariants] = await Promise.all([
     parseUnicodeData(join(UCD_DIR, 'UnicodeData.txt')),
     parseNameAliases(join(UCD_DIR, 'NameAliases.txt')),
     parseBlocks(join(UCD_DIR, 'Blocks.txt')),
@@ -65,7 +67,12 @@ async function main() {
     parseJis0208(join(UCD_DIR, 'mappings/JIS0208.TXT')),
     parseCp932(join(UCD_DIR, 'mappings/CP932.TXT')),
     parseCldrAnnotations(join(UCD_DIR, 'cldr/annotations-en.json')),
+    parseStandardizedVariants(join(UCD_DIR, 'StandardizedVariants.txt')),
+    parseEmojiVariationSequences(join(UCD_DIR, 'emoji/emoji-variation-sequences.txt')),
   ]);
+
+  // Merge variation sequences (standardized + emoji)
+  const allVariationSequences = [...standardizedVariants, ...emojiVariants];
 
   console.log(`  UnicodeData: ${unicodeData.length} characters`);
   console.log(`  NameAliases: ${nameAliases.length} aliases`);
@@ -77,6 +84,7 @@ async function main() {
   console.log(`  JIS X 0208: ${jis0208Set.size} codepoints`);
   console.log(`  CP932: ${cp932Set.size} codepoints`);
   console.log(`  CLDR Annotations: ${cldrAnnotations.length} entries`);
+  console.log(`  Variation Sequences: ${allVariationSequences.length} entries`);
 
   // Insert blocks using Drizzle
   console.log('\nInserting blocks...');
@@ -181,6 +189,19 @@ async function main() {
     db.insert(schema.cldrAnnotations).values(batch).onConflictDoNothing().run();
   }
   console.log(`  Inserted ${cldrAnnotations.length} CLDR annotations`);
+
+  // Insert variation sequences
+  console.log('Inserting variation sequences...');
+  const variationValues = allVariationSequences.map(v => ({
+    baseCp: v.baseCp,
+    variationSelector: v.variationSelector,
+    description: v.description,
+  }));
+
+  for (const batch of chunk(variationValues, BATCH_SIZE)) {
+    db.insert(schema.variationSequences).values(batch).onConflictDoNothing().run();
+  }
+  console.log(`  Inserted ${allVariationSequences.length} variation sequences`);
 
   // Note: FTS4 search index removed. FlexSearch is used on browser side instead.
   // Search index is built dynamically from characters + unihan_properties tables.

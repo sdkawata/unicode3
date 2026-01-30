@@ -117,6 +117,26 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
       )}
 
+      {/* Variation Sequences */}
+      {info.variationSequences.length > 0 && (
+        <div>
+          <div className="text-sm text-gray-500 mb-1">Variation Sequences</div>
+          <div className="space-y-2">
+            {info.variationSequences.map((vs, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm">
+                <span className="text-2xl">
+                  {String.fromCodePoint(info.codepoint, vs.variationSelector)}
+                </span>
+                <span className="font-mono text-gray-500">
+                  +{formatCodePoint(vs.variationSelector)}
+                </span>
+                <span className="text-gray-600">{vs.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Aliases */}
       {info.aliases.length > 0 && (
         <div>

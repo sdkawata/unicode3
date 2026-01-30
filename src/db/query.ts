@@ -26,6 +26,7 @@ export type CharacterInfo = {
   decomposition: number[];
   unihanProperties: { property: string; value: string }[];
   cldrAnnotation: { keywords: string[]; tts: string | null } | null;
+  variationSequences: { variationSelector: number; description: string }[];
 };
 
 export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo | null> {
@@ -93,6 +94,15 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     .where(eq(schema.cldrAnnotations.codepoint, codepoint))
     .limit(1);
 
+  // Get variation sequences
+  const variationSeqs = await db
+    .select({
+      variationSelector: schema.variationSequences.variationSelector,
+      description: schema.variationSequences.description,
+    })
+    .from(schema.variationSequences)
+    .where(eq(schema.variationSequences.baseCp, codepoint));
+
   return {
     codepoint: char.codepoint,
     name: char.name,
@@ -112,6 +122,7 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     cldrAnnotation: cldrRow
       ? { keywords: cldrRow.keywords.split(', '), tts: cldrRow.tts }
       : null,
+    variationSequences: variationSeqs,
   };
 }
 

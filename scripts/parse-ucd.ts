@@ -322,6 +322,12 @@ export interface CldrAnnotation {
   tts: string | null;
 }
 
+export interface VariationSequence {
+  baseCp: number;
+  variationSelector: number;
+  description: string;
+}
+
 // Parse CLDR annotations JSON
 // Format: { annotations: { annotations: { "😀": { default: [...], tts: [...] } } } }
 export async function parseCldrAnnotations(filepath: string): Promise<CldrAnnotation[]> {
@@ -347,6 +353,54 @@ export async function parseCldrAnnotations(filepath: string): Promise<CldrAnnota
         codepoint,
         keywords: entry.default.join(', '),
         tts: entry.tts?.[0] ?? null,
+      });
+    }
+  }
+
+  return results;
+}
+
+// Parse StandardizedVariants.txt
+// Format: base_cp variation_selector; description; # comment
+// Example: 0030 FE00; digit zero; # DIGIT ZERO
+export async function parseStandardizedVariants(filepath: string): Promise<VariationSequence[]> {
+  const content = await readFile(filepath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+  const results: VariationSequence[] = [];
+
+  for (const line of lines) {
+    // Match: XXXX YYYY; description;
+    const match = line.match(/^([0-9A-F]+)\s+([0-9A-F]+)\s*;\s*([^;]+)/i);
+    if (match) {
+      results.push({
+        baseCp: parseInt(match[1], 16),
+        variationSelector: parseInt(match[2], 16),
+        description: match[3].trim(),
+      });
+    }
+  }
+
+  return results;
+}
+
+// Parse emoji-variation-sequences.txt
+// Format: base_cp variation_selector; style; # comment
+// Example: 0023 FE0E; text style; # NUMBER SIGN
+export async function parseEmojiVariationSequences(filepath: string): Promise<VariationSequence[]> {
+  const content = await readFile(filepath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+  const results: VariationSequence[] = [];
+
+  for (const line of lines) {
+    // Match: XXXX YYYY; style;
+    const match = line.match(/^([0-9A-F]+)\s+([0-9A-F]+)\s*;\s*([^;#]+)/i);
+    if (match) {
+      results.push({
+        baseCp: parseInt(match[1], 16),
+        variationSelector: parseInt(match[2], 16),
+        description: match[3].trim(),
       });
     }
   }

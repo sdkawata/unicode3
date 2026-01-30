@@ -17,6 +17,8 @@ const FILES_TO_DOWNLOAD = [
   'PropertyValueAliases.txt',
   'EastAsianWidth.txt',
   'emoji/emoji-data.txt',
+  'emoji/emoji-variation-sequences.txt',
+  'StandardizedVariants.txt',
 ];
 
 // マッピングファイル (Unicode公式)
