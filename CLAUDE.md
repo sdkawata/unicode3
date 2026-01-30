@@ -94,6 +94,8 @@ UI 変更後は Playwright MCP で動作確認すること。開発サーバー 
 3. `mcp__playwright__browser_click` / `mcp__playwright__browser_type` で操作
 4. `mcp__playwright__browser_console_messages` でエラーがないか確認
 
+**注意**: `npm run dev` の実行は人間に任せる。Claude は開発サーバーを起動しない。動作確認時にサーバーが起動していなさそうであれば、人間に `npm run dev` の実行を依頼すること。
+
 ## コミット前の確認
 
 **コミット前に必ず以下を実行すること:**

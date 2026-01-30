@@ -1,11 +1,54 @@
-import { useState, useTransition, Suspense, useSyncExternalStore } from 'react'
+import { useTransition, Suspense, useSyncExternalStore, useEffect, useState, useRef } from 'react'
+import { Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router'
 import type { CharacterInfo } from './db/query'
 import { getCharacterInfo, searchCharacters, preloadSearchIndex, isSearchIndexReady, onSearchIndexReady } from './db/query'
 import { getCodePoints } from './components/format'
 import { CharacterView } from './components/CharacterView'
 import { SearchResultView } from './components/SearchResultView'
+import React from 'react'
 
 type Mode = 'input' | 'search'
+
+// Custom hook for IME-aware input with URL sync
+function useUrlSyncedInput(paramName: string, searchParams: URLSearchParams, setSearchParams: (params: Record<string, string>, options?: { replace?: boolean }) => void) {
+  const urlValue = searchParams.get(paramName) ?? ''
+  const [localValue, setLocalValue] = useState(urlValue)
+  const isComposingRef = useRef(false)
+
+  // Sync local value when URL changes (e.g., browser back/forward)
+  useEffect(() => {
+    if (!isComposingRef.current) {
+      setLocalValue(urlValue)
+    }
+  }, [urlValue])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    // Only update URL if not composing
+    if (!isComposingRef.current) {
+      setSearchParams(newValue ? { [paramName]: newValue } : {}, { replace: true })
+    }
+  }
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true
+  }
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false
+    // Update URL with the final composed value
+    const newValue = e.currentTarget.value
+    setSearchParams(newValue ? { [paramName]: newValue } : {}, { replace: true })
+  }
+
+  return {
+    value: localValue,
+    onChange: handleChange,
+    onCompositionStart: handleCompositionStart,
+    onCompositionEnd: handleCompositionEnd,
+  }
+}
 
 // Start loading search index immediately on module load
 preloadSearchIndex()
@@ -91,35 +134,53 @@ function fetchCharInfosForSearch(codepoints: number[]): Promise<Map<number, Char
   return promise
 }
 
-function App() {
-  const [mode, setMode] = useState<Mode>('input')
-  const [input, setInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [infoPromise, setInfoPromise] = useState(() => fetchCharInfos(''))
-  const [searchResultsPromise, setSearchResultsPromise] = useState<Promise<number[]>>(() => Promise.resolve([]))
+function AppContent({ mode }: { mode: Mode }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [, startTransition] = useTransition()
 
-  const handleInputChange = (value: string) => {
-    setInput(value)
-    startTransition(() => {
-      setInfoPromise(fetchCharInfos(value))
-    })
-  }
+  // IME-aware input handling
+  const inputProps = useUrlSyncedInput('text', searchParams, setSearchParams)
+  const searchProps = useUrlSyncedInput('q', searchParams, setSearchParams)
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-    startTransition(() => {
-      setSearchResultsPromise(fetchSearchResults(value))
-    })
+  // Get values for data fetching (from URL for consistency)
+  const input = mode === 'input' ? (searchParams.get('text') ?? '') : ''
+  const searchQuery = mode === 'search' ? (searchParams.get('q') ?? '') : ''
+
+  // Initialize promises based on URL params
+  const [infoPromise, setInfoPromise] = React.useState(() => fetchCharInfos(input))
+  const [searchResultsPromise, setSearchResultsPromise] = React.useState<Promise<number[]>>(() =>
+    mode === 'search' ? fetchSearchResults(searchQuery) : Promise.resolve([])
+  )
+
+  // Update promises when URL params change
+  useEffect(() => {
+    if (mode === 'input') {
+      startTransition(() => {
+        setInfoPromise(fetchCharInfos(input))
+      })
+    }
+  }, [input, mode])
+
+  useEffect(() => {
+    if (mode === 'search') {
+      startTransition(() => {
+        setSearchResultsPromise(fetchSearchResults(searchQuery))
+      })
+    }
+  }, [searchQuery, mode])
+
+  const handleModeChange = (newMode: Mode) => {
+    if (newMode === 'input') {
+      navigate('/input')
+    } else {
+      navigate('/search')
+    }
   }
 
   const handleAddToInput = (char: string) => {
     const newInput = input + char
-    setInput(newInput)
-    setMode('input')
-    startTransition(() => {
-      setInfoPromise(fetchCharInfos(newInput))
-    })
+    navigate(`/input?text=${encodeURIComponent(newInput)}`)
   }
 
   return (
@@ -134,7 +195,7 @@ function App() {
           {/* Mode Toggle */}
           <div className="flex gap-2 mb-4">
             <button
-              onClick={() => setMode('input')}
+              onClick={() => handleModeChange('input')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 mode === 'input'
                   ? 'bg-blue-600 text-white'
@@ -144,7 +205,7 @@ function App() {
               文字を入力
             </button>
             <button
-              onClick={() => setMode('search')}
+              onClick={() => handleModeChange('search')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 mode === 'search'
                   ? 'bg-blue-600 text-white'
@@ -159,16 +220,20 @@ function App() {
           {mode === 'input' ? (
             <input
               type="text"
-              value={input}
-              onChange={(e) => handleInputChange(e.target.value)}
+              value={inputProps.value}
+              onChange={inputProps.onChange}
+              onCompositionStart={inputProps.onCompositionStart}
+              onCompositionEnd={inputProps.onCompositionEnd}
               placeholder="文字列を入力..."
               className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           ) : (
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              value={searchProps.value}
+              onChange={searchProps.onChange}
+              onCompositionStart={searchProps.onCompositionStart}
+              onCompositionEnd={searchProps.onCompositionEnd}
               placeholder="検索... (例: LATIN, YAMA, HIRAGANA)"
               className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -237,6 +302,14 @@ function SearchResults({
   )
 }
 
-import React from 'react'
+function App() {
+  return (
+    <Routes>
+      <Route path="/input" element={<AppContent mode="input" />} />
+      <Route path="/search" element={<AppContent mode="search" />} />
+      <Route path="/" element={<Navigate to="/input" replace />} />
+    </Routes>
+  )
+}
 
 export default App
