@@ -1,5 +1,8 @@
 import { eq, and, lte, gte } from 'drizzle-orm';
-import { getDb, getSqlite, schema } from './client-browser';
+import { getDb, schema } from './client-browser';
+
+// Re-export searchCharacters from the FlexSearch-based module
+export { searchCharacters } from '../lib/search';
 
 export type CharacterInfo = {
   codepoint: number;
@@ -108,30 +111,6 @@ export async function getCharactersInfo(codepoints: number[]): Promise<Map<numbe
   return results;
 }
 
-// Search characters using FTS4
-// NOTE: FTS4 は Drizzle がネイティブサポートしていないため、生の sql.js API を使用
-// これは FTS4 関連処理のみの例外。通常のクエリは Drizzle のメソッドを使うこと
-export async function searchCharacters(query: string, limit = 100): Promise<number[]> {
-  if (!query || query.trim().length === 0) {
-    return [];
-  }
-
-  const sqlite = await getSqlite();
-
-  const stmt = sqlite.prepare(
-    `SELECT rowid as codepoint FROM search_fts WHERE search_fts MATCH ? LIMIT ?`
-  );
-  stmt.bind([query.trim(), limit]);
-
-  const results: number[] = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as { codepoint: number };
-    results.push(row.codepoint);
-  }
-  stmt.free();
-
-  return results;
-}
 
 // Helper to get display name (prefer correction alias, then name, then label)
 export function getDisplayName(info: CharacterInfo): string {

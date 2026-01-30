@@ -166,30 +166,8 @@ async function main() {
   }
   console.log(`  Inserted ${unihanData.length} Unihan properties`);
 
-  // Create FTS4 search index
-  // NOTE: FTS4 は Drizzle がネイティブサポートしていないため、better-sqlite3 API を直接使用
-  // これは FTS4 関連処理のみの例外。通常のテーブル操作は Drizzle のメソッドを使うこと
-  console.log('Creating FTS4 search index...');
-  sqlite.exec('CREATE VIRTUAL TABLE search_fts USING fts4(name, readings)');
-
-  // Build search data: name + kJapaneseKun + kJapaneseOn
-  const searchData = sqlite.prepare(`
-    SELECT c.codepoint, c.name,
-           GROUP_CONCAT(CASE WHEN u.property IN ('kJapaneseKun', 'kJapaneseOn') THEN u.value END, ' ') as readings
-    FROM characters c
-    LEFT JOIN unihan_properties u ON c.codepoint = u.codepoint
-    WHERE c.name IS NOT NULL OR u.property IS NOT NULL
-    GROUP BY c.codepoint
-  `).all() as { codepoint: number; name: string | null; readings: string | null }[];
-
-  const insertFts = sqlite.prepare('INSERT INTO search_fts(rowid, name, readings) VALUES (?, ?, ?)');
-  const insertFtsMany = sqlite.transaction((rows: typeof searchData) => {
-    for (const r of rows) {
-      insertFts.run(r.codepoint, r.name, r.readings);
-    }
-  });
-  insertFtsMany(searchData);
-  console.log(`  Indexed ${searchData.length} characters for search`);
+  // Note: FTS4 search index removed. FlexSearch is used on browser side instead.
+  // Search index is built dynamically from characters + unihan_properties tables.
 
   // Optimize database
   console.log('\nOptimizing database...');

@@ -17,9 +17,15 @@ src/
   main.tsx             # エントリポイント
   db/
     schema.ts          # Drizzle テーブル定義 (characters, decompositionMappings, nameAliases, blocks, unihanProperties)
-    client-browser.ts  # ブラウザ用 sql.js DB クライアント
+    client-browser.ts  # ブラウザ用 sql.js DB クライアント + IndexedDB キャッシュ
+    query.ts           # DB クエリ関数 (getCharacterInfo, getDisplayName)
   lib/
-    unicode-db.ts      # DB アクセス関数 (getCharacterInfo, getDisplayName)
+    search.ts          # FlexSearch による全文検索 (searchCharacters) + IndexedDB キャッシュ
+  components/
+    CharacterView.tsx  # 文字入力モードの結果表示
+    SearchResultView.tsx # 検索モードの結果表示
+    DetailPanel.tsx    # 文字詳細パネル
+    format.ts          # フォーマット用ユーティリティ
 scripts/
   download-ucd.ts      # UCD ファイル + Unihan.zip をダウンロード → data/ucd/
   parse-ucd.ts         # UCD テキストファイルをパースする関数群
@@ -59,10 +65,14 @@ npm run build          # プロダクションビルド
   - テーブル定義: `src/db/schema.ts` に Drizzle スキーマとして定義
   - テーブル作成: `drizzle-kit generate` でマイグレーション生成
   - クエリ: Drizzle のクエリビルダー (`db.select()`, `db.insert()` 等) を使用
-- **例外: FTS4 全文検索**
-  - Drizzle は FTS4 仮想テーブルをネイティブサポートしていない
-  - FTS4 関連処理のみ、生 SQL (`sql` タグ) や生の sql.js API を使用可
-  - 該当箇所にはコメントで例外であることを明記すること
+
+### 全文検索
+
+- **FlexSearch** を使用（ブラウザ上で動的にインデックス構築）
+- 検索データは DB の `characters` + `unihan_properties` テーブルから取得
+- インデックスは IndexedDB にキャッシュ（`__DB_VERSION__` でバージョン管理）
+- `tokenize: "full"` により完全な部分一致検索が可能
+- 実装: `src/lib/search.ts`
 
 ## スキーマ変更時の手順
 
