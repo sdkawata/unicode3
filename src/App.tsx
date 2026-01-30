@@ -1,4 +1,4 @@
-import { useState, useTransition, Suspense, useEffect, useSyncExternalStore } from 'react'
+import { useState, useTransition, Suspense, useSyncExternalStore } from 'react'
 import type { CharacterInfo } from './db/query'
 import { getCharacterInfo, searchCharacters, preloadSearchIndex, isSearchIndexReady, onSearchIndexReady } from './db/query'
 import { getCodePoints } from './components/format'
