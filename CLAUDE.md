@@ -19,8 +19,8 @@ src/
     schema.ts          # Drizzle テーブル定義 (characters, decompositionMappings, nameAliases, blocks, unihanProperties)
     client-browser.ts  # ブラウザ用 sql.js DB クライアント + IndexedDB キャッシュ
     query.ts           # DB クエリ関数 (getCharacterInfo, getDisplayName)
-  lib/
-    search.ts          # FlexSearch による全文検索 (searchCharacters) + IndexedDB キャッシュ
+    search.ts          # FlexSearch 検索 API + Worker 管理 + IndexedDB キャッシュ
+    search.worker.ts   # FlexSearch インデックス構築 Worker
   components/
     CharacterView.tsx  # 文字入力モードの結果表示
     SearchResultView.tsx # 検索モードの結果表示
@@ -69,10 +69,11 @@ npm run build          # プロダクションビルド
 ### 全文検索
 
 - **FlexSearch** を使用（ブラウザ上で動的にインデックス構築）
-- 検索データは DB の `characters` + `unihan_properties` テーブルから取得
+- 検索データは Drizzle ORM で `characters` + `unihan_properties` テーブルから取得
+- インデックス構築は **Web Worker** で実行（UI ブロッキング回避）
 - インデックスは IndexedDB にキャッシュ（`__DB_VERSION__` でバージョン管理）
 - `tokenize: "full"` により完全な部分一致検索が可能
-- 実装: `src/lib/search.ts`
+- 実装: `src/db/search.ts`, `src/db/search.worker.ts`
 
 ## スキーマ変更時の手順
 

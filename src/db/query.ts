@@ -2,7 +2,7 @@ import { eq, and, lte, gte } from 'drizzle-orm';
 import { getDb, schema } from './client-browser';
 
 // Re-export searchCharacters from the FlexSearch-based module
-export { searchCharacters } from '../lib/search';
+export { searchCharacters } from './search';
 
 export type CharacterInfo = {
   codepoint: number;

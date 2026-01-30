@@ -1,0 +1,249 @@
+import { isNotNull, inArray } from 'drizzle-orm';
+import { getDb, schema } from './client-browser';
+import type { SearchData, WorkerMessage, WorkerResponse } from './search.worker';
+import SearchWorker from './search.worker?worker';
+
+const IDB_NAME = 'unicode-viewer-cache';
+const IDB_STORE = 'db-cache';
+const SEARCH_INDEX_KEY = 'flexsearch-index';
+const SEARCH_INDEX_VERSION_KEY = 'flexsearch-version';
+
+let worker: Worker | null = null;
+let workerReady = false;
+let initPromise: Promise<void> | null = null;
+let pendingSearches: Map<string, { resolve: (results: number[]) => void; reject: (err: Error) => void }> = new Map();
+let searchIdCounter = 0;
+
+// IndexedDB helpers
+function openIDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(IDB_STORE);
+    };
+  });
+}
+
+function idbGet<T>(db: IDBDatabase, key: string): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const request = tx.objectStore(IDB_STORE).get(key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+function idbPut(db: IDBDatabase, key: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const request = tx.objectStore(IDB_STORE).put(value, key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+}
+
+// Load search data using Drizzle ORM
+async function loadSearchDataFromDb(): Promise<SearchData[]> {
+  const db = await getDb();
+
+  // Get all characters with names
+  const chars = await db
+    .select({
+      codepoint: schema.characters.codepoint,
+      name: schema.characters.name,
+    })
+    .from(schema.characters)
+    .where(isNotNull(schema.characters.name));
+
+  // Get Japanese readings (kJapaneseKun, kJapaneseOn)
+  const readings = await db
+    .select({
+      codepoint: schema.unihanProperties.codepoint,
+      value: schema.unihanProperties.value,
+    })
+    .from(schema.unihanProperties)
+    .where(inArray(schema.unihanProperties.property, ['kJapaneseKun', 'kJapaneseOn']));
+
+  // Group readings by codepoint
+  const readingsMap = new Map<number, string[]>();
+  for (const r of readings) {
+    const existing = readingsMap.get(r.codepoint) || [];
+    existing.push(r.value);
+    readingsMap.set(r.codepoint, existing);
+  }
+
+  // Build search data
+  const searchData: SearchData[] = [];
+  const seenCodepoints = new Set<number>();
+
+  for (const char of chars) {
+    const readings = readingsMap.get(char.codepoint);
+    const text = [char.name, readings?.join(' ')].filter(Boolean).join(' ');
+    if (text) {
+      searchData.push({ codepoint: char.codepoint, text });
+      seenCodepoints.add(char.codepoint);
+    }
+  }
+
+  // Add characters that only have readings (no name)
+  for (const [codepoint, values] of readingsMap) {
+    if (!seenCodepoints.has(codepoint)) {
+      searchData.push({ codepoint, text: values.join(' ') });
+    }
+  }
+
+  return searchData;
+}
+
+function postToWorker(msg: WorkerMessage): void {
+  worker?.postMessage(msg);
+}
+
+function handleWorkerMessage(e: MessageEvent<WorkerResponse>): void {
+  const msg = e.data;
+
+  switch (msg.type) {
+    case 'ready':
+    case 'imported':
+      workerReady = true;
+      break;
+    case 'results':
+      // Resolve pending search (using searchIdCounter trick not needed for single search)
+      for (const [, pending] of pendingSearches) {
+        pending.resolve(msg.codepoints);
+      }
+      pendingSearches.clear();
+      break;
+    case 'error':
+      for (const [, pending] of pendingSearches) {
+        pending.reject(new Error(msg.message));
+      }
+      pendingSearches.clear();
+      break;
+  }
+}
+
+async function initializeWorker(): Promise<void> {
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    worker = new SearchWorker();
+    worker.onmessage = handleWorkerMessage;
+
+    const currentVersion = __DB_VERSION__;
+
+    // Dev mode: skip cache, always rebuild
+    if (import.meta.env.DEV) {
+      console.log('[Search] Dev mode, building index in worker...');
+      const data = await loadSearchDataFromDb();
+
+      await new Promise<void>((resolve) => {
+        const originalHandler = worker!.onmessage;
+        worker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
+          if (e.data.type === 'ready') {
+            workerReady = true;
+            worker!.onmessage = originalHandler;
+            resolve();
+          }
+        };
+        postToWorker({ type: 'build', data });
+      });
+
+      console.log(`[Search] Index built with ${data.length} entries`);
+      return;
+    }
+
+    // Try to load cached index from IndexedDB
+    try {
+      const idb = await openIDB();
+      const cachedVersion = await idbGet<string>(idb, SEARCH_INDEX_VERSION_KEY);
+      const cachedData = await idbGet<Record<string, string>>(idb, SEARCH_INDEX_KEY);
+
+      if (cachedData && cachedVersion === currentVersion) {
+        console.log(`[Search] Cache hit (version: ${currentVersion}), importing in worker...`);
+
+        await new Promise<void>((resolve) => {
+          const originalHandler = worker!.onmessage;
+          worker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
+            if (e.data.type === 'imported') {
+              workerReady = true;
+              worker!.onmessage = originalHandler;
+              resolve();
+            }
+          };
+          postToWorker({ type: 'import', exported: cachedData });
+        });
+
+        idb.close();
+        return;
+      }
+
+      console.log(`[Search] Cache miss (cached: ${cachedVersion}, current: ${currentVersion}), building in worker...`);
+
+      // Build index from DB
+      const data = await loadSearchDataFromDb();
+
+      const exported = await new Promise<Record<string, string>>((resolve) => {
+        const originalHandler = worker!.onmessage;
+        worker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
+          if (e.data.type === 'ready') {
+            workerReady = true;
+            worker!.onmessage = originalHandler;
+            resolve(e.data.exported);
+          }
+        };
+        postToWorker({ type: 'build', data });
+      });
+
+      console.log(`[Search] Index built with ${data.length} entries`);
+
+      // Cache to IndexedDB
+      await idbPut(idb, SEARCH_INDEX_KEY, exported);
+      await idbPut(idb, SEARCH_INDEX_VERSION_KEY, currentVersion);
+      console.log(`[Search] Cached (version: ${currentVersion})`);
+
+      idb.close();
+    } catch (e) {
+      // IndexedDB failed, build without caching
+      console.warn('[Search] IndexedDB unavailable, building without cache:', e);
+      const data = await loadSearchDataFromDb();
+
+      await new Promise<void>((resolve) => {
+        const originalHandler = worker!.onmessage;
+        worker!.onmessage = (ev: MessageEvent<WorkerResponse>) => {
+          if (ev.data.type === 'ready') {
+            workerReady = true;
+            worker!.onmessage = originalHandler;
+            resolve();
+          }
+        };
+        postToWorker({ type: 'build', data });
+      });
+    }
+  })();
+
+  return initPromise;
+}
+
+export async function searchCharacters(query: string, limit = 100): Promise<number[]> {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  await initializeWorker();
+
+  return new Promise((resolve, reject) => {
+    const id = String(++searchIdCounter);
+    pendingSearches.set(id, { resolve, reject });
+    postToWorker({ type: 'search', query: query.trim(), limit });
+  });
+}
+
+// Pre-initialize the worker (can be called early to start building in background)
+export function preloadSearchIndex(): void {
+  initializeWorker().catch(console.error);
+}
