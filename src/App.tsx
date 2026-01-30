@@ -178,11 +178,6 @@ function AppContent({ mode }: { mode: Mode }) {
     }
   }
 
-  const handleAddToInput = (char: string) => {
-    const newInput = input + char
-    navigate(`/input?text=${encodeURIComponent(newInput)}`)
-  }
-
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Fixed Header */}
@@ -251,7 +246,6 @@ function AppContent({ mode }: { mode: Mode }) {
               <SearchResults
                 searchResultsPromise={searchResultsPromise}
                 searchQuery={searchQuery}
-                onAddToInput={handleAddToInput}
               />
             )}
           </Suspense>
@@ -265,11 +259,9 @@ function AppContent({ mode }: { mode: Mode }) {
 function SearchResults({
   searchResultsPromise,
   searchQuery,
-  onAddToInput,
 }: {
   searchResultsPromise: Promise<number[]>
   searchQuery: string
-  onAddToInput: (char: string) => void
 }) {
   const isIndexReady = useSearchIndexReady()
   const searchResults = React.use(searchResultsPromise)
@@ -297,7 +289,6 @@ function SearchResults({
     <SearchResultView
       searchResults={searchResults}
       charInfosPromise={charInfosPromise}
-      onAddToInput={onAddToInput}
     />
   )
 }

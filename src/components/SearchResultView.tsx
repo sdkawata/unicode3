@@ -7,10 +7,9 @@ import { DetailPanel } from './DetailPanel'
 type Props = {
   searchResults: number[]
   charInfosPromise: Promise<Map<number, CharacterInfo>>
-  onAddToInput: (char: string) => void
 }
 
-export function SearchResultView({ searchResults, charInfosPromise, onAddToInput }: Props) {
+export function SearchResultView({ searchResults, charInfosPromise }: Props) {
   const charInfos = use(charInfosPromise)
   const [selectedCp, setSelectedCp] = useState<number | null>(
     searchResults.length > 0 ? searchResults[0] : null
@@ -36,7 +35,6 @@ export function SearchResultView({ searchResults, charInfosPromise, onAddToInput
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">文字</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">コードポイント</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">名前</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600"></th>
             </tr>
           </thead>
         </table>
@@ -59,18 +57,6 @@ export function SearchResultView({ searchResults, charInfosPromise, onAddToInput
                         ? getDisplayName(info)
                         : <span className="inline-block h-4 w-48 bg-gray-200 rounded animate-pulse" />
                       }
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onAddToInput(String.fromCodePoint(cp))
-                        }}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                        title="入力欄に追加"
-                      >
-                        + 追加
-                      </button>
                     </td>
                   </tr>
                 )
