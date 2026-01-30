@@ -58,21 +58,21 @@ async function loadSearchDataFromDb(): Promise<SearchData[]> {
     .from(schema.characters)
     .where(isNotNull(schema.characters.name));
 
-  // Get Japanese readings (kJapaneseKun, kJapaneseOn)
-  const readings = await db
+  // Get Unihan properties for search (Japanese readings + definitions)
+  const unihanProps = await db
     .select({
       codepoint: schema.unihanProperties.codepoint,
       value: schema.unihanProperties.value,
     })
     .from(schema.unihanProperties)
-    .where(inArray(schema.unihanProperties.property, ['kJapaneseKun', 'kJapaneseOn']));
+    .where(inArray(schema.unihanProperties.property, ['kJapaneseKun', 'kJapaneseOn', 'kDefinition']));
 
-  // Group readings by codepoint
-  const readingsMap = new Map<number, string[]>();
-  for (const r of readings) {
-    const existing = readingsMap.get(r.codepoint) || [];
+  // Group Unihan values by codepoint
+  const unihanMap = new Map<number, string[]>();
+  for (const r of unihanProps) {
+    const existing = unihanMap.get(r.codepoint) || [];
     existing.push(r.value);
-    readingsMap.set(r.codepoint, existing);
+    unihanMap.set(r.codepoint, existing);
   }
 
   // Build search data
@@ -80,16 +80,16 @@ async function loadSearchDataFromDb(): Promise<SearchData[]> {
   const seenCodepoints = new Set<number>();
 
   for (const char of chars) {
-    const readings = readingsMap.get(char.codepoint);
-    const text = [char.name, readings?.join(' ')].filter(Boolean).join(' ');
+    const unihanValues = unihanMap.get(char.codepoint);
+    const text = [char.name, unihanValues?.join(' ')].filter(Boolean).join(' ');
     if (text) {
       searchData.push({ codepoint: char.codepoint, text });
       seenCodepoints.add(char.codepoint);
     }
   }
 
-  // Add characters that only have readings (no name)
-  for (const [codepoint, values] of readingsMap) {
+  // Add characters that only have Unihan properties (no name)
+  for (const [codepoint, values] of unihanMap) {
     if (!seenCodepoints.has(codepoint)) {
       searchData.push({ codepoint, text: values.join(' ') });
     }
