@@ -123,67 +123,74 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-[1600px] mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
-          Unicode Viewer
-        </h1>
+    <div className="h-screen flex flex-col bg-gray-100">
+      {/* Fixed Header */}
+      <div className="shrink-0 px-8 pt-8 pb-4 bg-gray-100">
+        <div className="max-w-[1600px] mx-auto">
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">
+            Unicode Viewer
+          </h1>
 
-        {/* Mode Toggle */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setMode('input')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              mode === 'input'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            文字を入力
-          </button>
-          <button
-            onClick={() => setMode('search')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              mode === 'search'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            検索
-          </button>
-        </div>
+          {/* Mode Toggle */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setMode('input')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                mode === 'input'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              文字を入力
+            </button>
+            <button
+              onClick={() => setMode('search')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                mode === 'search'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              検索
+            </button>
+          </div>
 
-        {/* Input / Search Field */}
-        {mode === 'input' ? (
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="文字列を入力..."
-            className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
-          />
-        ) : (
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="検索... (例: LATIN, YAMA, HIRAGANA)"
-            className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
-          />
-        )}
-
-        {/* Results */}
-        <Suspense fallback={<div className="text-gray-500">読み込み中...</div>}>
+          {/* Input / Search Field */}
           {mode === 'input' ? (
-            <CharacterView infoPromise={infoPromise} input={input} />
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => handleInputChange(e.target.value)}
+              placeholder="文字列を入力..."
+              className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           ) : (
-            <SearchResults
-              searchResultsPromise={searchResultsPromise}
-              searchQuery={searchQuery}
-              onAddToInput={handleAddToInput}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="検索... (例: LATIN, YAMA, HIRAGANA)"
+              className="w-full p-4 text-lg bg-white border border-gray-300 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           )}
-        </Suspense>
+        </div>
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div className="flex-1 min-h-0 px-8 pb-8">
+        <div className="max-w-[1600px] mx-auto h-full">
+          <Suspense fallback={<div className="text-gray-500">読み込み中...</div>}>
+            {mode === 'input' ? (
+              <CharacterView infoPromise={infoPromise} input={input} />
+            ) : (
+              <SearchResults
+                searchResultsPromise={searchResultsPromise}
+                searchQuery={searchQuery}
+                onAddToInput={handleAddToInput}
+              />
+            )}
+          </Suspense>
+        </div>
       </div>
     </div>
   )
