@@ -1,6 +1,6 @@
 import type { CharacterInfo } from '../db/query'
 import { getDisplayName } from '../db/query'
-import { formatCodePoint, formatCategory, formatEastAsianWidth } from './format'
+import { formatCodePoint, formatCategory, formatEastAsianWidth, formatBidiClass } from './format'
 
 export function DetailPanel({ info }: { info: CharacterInfo }) {
   return (
@@ -40,7 +40,7 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
         <div>
           <div className="text-sm text-gray-500 mb-1">Bidi Class</div>
-          <div className="font-mono">{info.bidiClass ?? '-'}</div>
+          <div className="font-mono">{formatBidiClass(info.bidiClass)}</div>
         </div>
         <div>
           <div className="text-sm text-gray-500 mb-1">East Asian Width</div>

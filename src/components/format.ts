@@ -81,3 +81,35 @@ export function formatEastAsianWidth(eaw: string | null): string {
   }
   return `${eaw} (${names[eaw] ?? 'Unknown'})`
 }
+
+const bidiClassNames: Record<string, string> = {
+  L: 'Left-to-Right',
+  R: 'Right-to-Left',
+  AL: 'Arabic Letter',
+  EN: 'European Number',
+  ES: 'European Separator',
+  ET: 'European Terminator',
+  AN: 'Arabic Number',
+  CS: 'Common Separator',
+  NSM: 'Nonspacing Mark',
+  BN: 'Boundary Neutral',
+  B: 'Paragraph Separator',
+  S: 'Segment Separator',
+  WS: 'White Space',
+  ON: 'Other Neutral',
+  LRE: 'Left-to-Right Embedding',
+  LRO: 'Left-to-Right Override',
+  RLE: 'Right-to-Left Embedding',
+  RLO: 'Right-to-Left Override',
+  PDF: 'Pop Directional Format',
+  LRI: 'Left-to-Right Isolate',
+  RLI: 'Right-to-Left Isolate',
+  FSI: 'First Strong Isolate',
+  PDI: 'Pop Directional Isolate',
+}
+
+export function formatBidiClass(bidi: string | null): string {
+  if (!bidi) return '-'
+  const name = bidiClassNames[bidi]
+  return name ? `${bidi} (${name})` : bidi
+}
