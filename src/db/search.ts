@@ -7,6 +7,7 @@ const IDB_NAME = 'unicode-viewer-cache';
 const IDB_STORE = 'db-cache';
 const SEARCH_INDEX_KEY = 'flexsearch-index';
 const SEARCH_INDEX_VERSION_KEY = 'flexsearch-version';
+const SEARCH_NAMES_KEY = 'flexsearch-names';
 
 let worker: Worker | null = null;
 let workerReady = false;
@@ -67,6 +68,14 @@ async function loadSearchDataFromDb(): Promise<SearchData[]> {
     .from(schema.unihanProperties)
     .where(inArray(schema.unihanProperties.property, ['kJapaneseKun', 'kJapaneseOn', 'kDefinition']));
 
+  // Get CLDR annotations for search
+  const cldrAnnotations = await db
+    .select({
+      codepoint: schema.cldrAnnotations.codepoint,
+      keywords: schema.cldrAnnotations.keywords,
+    })
+    .from(schema.cldrAnnotations);
+
   // Group Unihan values by codepoint
   const unihanMap = new Map<number, string[]>();
   for (const r of unihanProps) {
@@ -75,15 +84,26 @@ async function loadSearchDataFromDb(): Promise<SearchData[]> {
     unihanMap.set(r.codepoint, existing);
   }
 
+  // Map CLDR annotations by codepoint
+  const cldrMap = new Map<number, string>();
+  for (const a of cldrAnnotations) {
+    cldrMap.set(a.codepoint, a.keywords);
+  }
+
   // Build search data
   const searchData: SearchData[] = [];
   const seenCodepoints = new Set<number>();
 
   for (const char of chars) {
     const unihanValues = unihanMap.get(char.codepoint);
-    const text = [char.name, unihanValues?.join(' ')].filter(Boolean).join(' ');
+    const cldrKeywords = cldrMap.get(char.codepoint);
+    const text = [char.name, unihanValues?.join(' '), cldrKeywords].filter(Boolean).join(' ');
     if (text) {
-      searchData.push({ codepoint: char.codepoint, text });
+      searchData.push({
+        codepoint: char.codepoint,
+        name: char.name ?? '',
+        text,
+      });
       seenCodepoints.add(char.codepoint);
     }
   }
@@ -91,7 +111,17 @@ async function loadSearchDataFromDb(): Promise<SearchData[]> {
   // Add characters that only have Unihan properties (no name)
   for (const [codepoint, values] of unihanMap) {
     if (!seenCodepoints.has(codepoint)) {
-      searchData.push({ codepoint, text: values.join(' ') });
+      const cldrKeywords = cldrMap.get(codepoint);
+      const text = [values.join(' '), cldrKeywords].filter(Boolean).join(' ');
+      searchData.push({ codepoint, name: '', text });
+      seenCodepoints.add(codepoint);
+    }
+  }
+
+  // Add characters that only have CLDR annotations (no name, no Unihan)
+  for (const [codepoint, keywords] of cldrMap) {
+    if (!seenCodepoints.has(codepoint)) {
+      searchData.push({ codepoint, name: '', text: keywords });
     }
   }
 
@@ -171,8 +201,9 @@ async function initializeWorker(): Promise<void> {
       const idb = await openIDB();
       const cachedVersion = await idbGet<string>(idb, SEARCH_INDEX_VERSION_KEY);
       const cachedData = await idbGet<Record<string, string>>(idb, SEARCH_INDEX_KEY);
+      const cachedNames = await idbGet<Record<number, string>>(idb, SEARCH_NAMES_KEY);
 
-      if (cachedData && cachedVersion === currentVersion) {
+      if (cachedData && cachedNames && cachedVersion === currentVersion) {
         console.log(`[Search] Cache hit (version: ${currentVersion}), importing in worker...`);
 
         await new Promise<void>((resolve) => {
@@ -184,7 +215,7 @@ async function initializeWorker(): Promise<void> {
               resolve();
             }
           };
-          postToWorker({ type: 'import', exported: cachedData });
+          postToWorker({ type: 'import', exported: cachedData, names: cachedNames });
         });
 
         idb.close();
@@ -196,13 +227,13 @@ async function initializeWorker(): Promise<void> {
       // Build index from DB
       const data = await loadSearchDataFromDb();
 
-      const exported = await new Promise<Record<string, string>>((resolve) => {
+      const { exported, names } = await new Promise<{ exported: Record<string, string>; names: Record<number, string> }>((resolve) => {
         const originalHandler = worker!.onmessage;
         worker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
           if (e.data.type === 'ready') {
             workerReady = true;
             worker!.onmessage = originalHandler;
-            resolve(e.data.exported);
+            resolve({ exported: e.data.exported, names: e.data.names });
           }
         };
         postToWorker({ type: 'build', data });
@@ -212,6 +243,7 @@ async function initializeWorker(): Promise<void> {
 
       // Cache to IndexedDB
       await idbPut(idb, SEARCH_INDEX_KEY, exported);
+      await idbPut(idb, SEARCH_NAMES_KEY, names);
       await idbPut(idb, SEARCH_INDEX_VERSION_KEY, currentVersion);
       console.log(`[Search] Cached (version: ${currentVersion})`);
 

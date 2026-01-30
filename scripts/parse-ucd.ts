@@ -315,3 +315,41 @@ export async function parseCp932(filepath: string): Promise<Set<number>> {
 
   return unicodeCodepoints;
 }
+
+export interface CldrAnnotation {
+  codepoint: number;
+  keywords: string;  // comma-separated keywords
+  tts: string | null;
+}
+
+// Parse CLDR annotations JSON
+// Format: { annotations: { annotations: { "😀": { default: [...], tts: [...] } } } }
+export async function parseCldrAnnotations(filepath: string): Promise<CldrAnnotation[]> {
+  const content = await readFile(filepath, 'utf-8');
+  const json = JSON.parse(content);
+  const annotations = json.annotations.annotations;
+  const results: CldrAnnotation[] = [];
+
+  for (const [char, data] of Object.entries(annotations)) {
+    // Get codepoint(s) from the character string
+    // Most are single characters, but some are sequences (we skip sequences for now)
+    const codepoints = [...char].map(c => c.codePointAt(0)!);
+    if (codepoints.length !== 1) {
+      // Skip emoji sequences (ZWJ sequences, flag sequences, etc.)
+      continue;
+    }
+
+    const codepoint = codepoints[0];
+    const entry = data as { default?: string[]; tts?: string[] };
+
+    if (entry.default && entry.default.length > 0) {
+      results.push({
+        codepoint,
+        keywords: entry.default.join(', '),
+        tts: entry.tts?.[0] ?? null,
+      });
+    }
+  }
+
+  return results;
+}

@@ -84,6 +84,24 @@ export function DetailPanel({ info }: { info: CharacterInfo }) {
         </div>
       )}
 
+      {/* CLDR Annotations */}
+      {info.cldrAnnotation && (
+        <div>
+          <div className="text-sm text-gray-500 mb-1">CLDR Annotations</div>
+          <div className="space-y-1">
+            {info.cldrAnnotation.tts && (
+              <div className="text-sm">
+                <span className="text-gray-400">TTS:</span>{' '}
+                <span>{info.cldrAnnotation.tts}</span>
+              </div>
+            )}
+            <div className="text-sm text-gray-600">
+              {info.cldrAnnotation.keywords.join(', ')}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Unihan Properties */}
       {info.unihanProperties.length > 0 && (
         <div>

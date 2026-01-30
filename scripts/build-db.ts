@@ -16,6 +16,7 @@ import {
   parseUnihan,
   parseJis0208,
   parseCp932,
+  parseCldrAnnotations,
   findBlock,
   findScript,
   findEastAsianWidth,
@@ -53,7 +54,7 @@ async function main() {
 
   // Parse UCD files
   console.log('Parsing UCD files...');
-  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData, jis0208Set, cp932Set] = await Promise.all([
+  const [unicodeData, nameAliases, blocks, scripts, eastAsianWidths, emojiSet, unihanData, jis0208Set, cp932Set, cldrAnnotations] = await Promise.all([
     parseUnicodeData(join(UCD_DIR, 'UnicodeData.txt')),
     parseNameAliases(join(UCD_DIR, 'NameAliases.txt')),
     parseBlocks(join(UCD_DIR, 'Blocks.txt')),
@@ -63,6 +64,7 @@ async function main() {
     parseUnihan(join(UCD_DIR, 'Unihan')),
     parseJis0208(join(UCD_DIR, 'mappings/JIS0208.TXT')),
     parseCp932(join(UCD_DIR, 'mappings/CP932.TXT')),
+    parseCldrAnnotations(join(UCD_DIR, 'cldr/annotations-en.json')),
   ]);
 
   console.log(`  UnicodeData: ${unicodeData.length} characters`);
@@ -74,6 +76,7 @@ async function main() {
   console.log(`  Unihan: ${unihanData.length} properties`);
   console.log(`  JIS X 0208: ${jis0208Set.size} codepoints`);
   console.log(`  CP932: ${cp932Set.size} codepoints`);
+  console.log(`  CLDR Annotations: ${cldrAnnotations.length} entries`);
 
   // Insert blocks using Drizzle
   console.log('\nInserting blocks...');
@@ -165,6 +168,19 @@ async function main() {
     db.insert(schema.unihanProperties).values(batch).onConflictDoNothing().run();
   }
   console.log(`  Inserted ${unihanData.length} Unihan properties`);
+
+  // Insert CLDR annotations
+  console.log('Inserting CLDR annotations...');
+  const cldrValues = cldrAnnotations.map(a => ({
+    codepoint: a.codepoint,
+    keywords: a.keywords,
+    tts: a.tts,
+  }));
+
+  for (const batch of chunk(cldrValues, BATCH_SIZE)) {
+    db.insert(schema.cldrAnnotations).values(batch).onConflictDoNothing().run();
+  }
+  console.log(`  Inserted ${cldrAnnotations.length} CLDR annotations`);
 
   // Note: FTS4 search index removed. FlexSearch is used on browser side instead.
   // Search index is built dynamically from characters + unihan_properties tables.

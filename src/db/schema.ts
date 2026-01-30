@@ -56,3 +56,12 @@ export const blocks = sqliteTable('blocks', {
 }, (table) => [
   primaryKey({ columns: [table.startCp, table.endCp] }),
 ]);
+
+// CLDR アノテーションテーブル
+export const cldrAnnotations = sqliteTable('cldr_annotations', {
+  codepoint: integer('codepoint').primaryKey(),
+  keywords: text('keywords').notNull(),  // カンマ区切りのキーワード
+  tts: text('tts'),                       // Text-to-Speech (読み上げ用テキスト)
+}, (table) => [
+  index('idx_cldr_codepoint').on(table.codepoint),
+]);

@@ -25,6 +25,7 @@ export type CharacterInfo = {
   aliases: { alias: string; type: string }[];
   decomposition: number[];
   unihanProperties: { property: string; value: string }[];
+  cldrAnnotation: { keywords: string[]; tts: string | null } | null;
 };
 
 export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo | null> {
@@ -82,6 +83,16 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     .from(schema.unihanProperties)
     .where(eq(schema.unihanProperties.codepoint, codepoint));
 
+  // Get CLDR annotations
+  const [cldrRow] = await db
+    .select({
+      keywords: schema.cldrAnnotations.keywords,
+      tts: schema.cldrAnnotations.tts,
+    })
+    .from(schema.cldrAnnotations)
+    .where(eq(schema.cldrAnnotations.codepoint, codepoint))
+    .limit(1);
+
   return {
     codepoint: char.codepoint,
     name: char.name,
@@ -98,6 +109,9 @@ export async function getCharacterInfo(codepoint: number): Promise<CharacterInfo
     aliases,
     decomposition: decomp.map(d => d.targetCp),
     unihanProperties: unihanProps,
+    cldrAnnotation: cldrRow
+      ? { keywords: cldrRow.keywords.split(', '), tts: cldrRow.tts }
+      : null,
   };
 }
 

@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 const UNICODE_VERSION = '16.0.0';
 const BASE_URL = `https://www.unicode.org/Public/${UNICODE_VERSION}/ucd`;
 const MAPPINGS_BASE_URL = 'https://www.unicode.org/Public/MAPPINGS';
+const CLDR_ANNOTATIONS_URL = 'https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-annotations-full/annotations/en/annotations.json';
 const OUTPUT_DIR = './data/ucd';
 
 const FILES_TO_DOWNLOAD = [
@@ -102,6 +103,22 @@ async function main() {
   }
   execSync(`unzip -o "${unihanZipPath}" -d "${unihanDir}"`);
   console.log(`  Extracted to ${unihanDir}`);
+
+  // Download CLDR annotations
+  console.log('\nDownloading CLDR annotations...');
+  const cldrDir = join(OUTPUT_DIR, 'cldr');
+  if (!existsSync(cldrDir)) {
+    await mkdir(cldrDir, { recursive: true });
+  }
+
+  const cldrResponse = await fetch(CLDR_ANNOTATIONS_URL);
+  if (!cldrResponse.ok) {
+    throw new Error(`Failed to download CLDR annotations: ${cldrResponse.status} ${cldrResponse.statusText}`);
+  }
+  const cldrText = await cldrResponse.text();
+  const cldrPath = join(cldrDir, 'annotations-en.json');
+  await writeFile(cldrPath, cldrText, 'utf-8');
+  console.log(`  Saved to ${cldrPath} (${cldrText.length} bytes)`);
 
   console.log('\nAll files downloaded successfully!');
 }
